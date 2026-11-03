@@ -16,7 +16,6 @@ export function validasi(s) {
   if (!/^\d{16}$/.test(s.pelanggan.noKK ?? '')) err.noKK = 'No. KK harus 16 digit'
   if (!/^08\d{8,11}$/.test(s.pelanggan.noHp ?? '')) err.noHp = 'Nomor HP tidak valid'
   if (!s.permohonan.dayaVA) err.daya = 'Pilih daya yang diajukan'
-  if (s.teknis.jarakTiangM != null && !(s.teknis.jarakTiangM >= 0)) err.jarak = 'Jarak harus angka 0 atau lebih'
   if (!s.lokasi?.lat) err.lokasi = 'Lokasi rumah belum diambil'
   if (!s.persetujuan.setuju) err.setuju = 'Persetujuan pelanggan wajib dicentang'
   return err
@@ -26,8 +25,7 @@ export function validasi(s) {
 let timer
 export function autosave(s) {
   clearTimeout(timer)
-  timer = setTimeout(() => simpanSurvei(s).then(() =>
-    document.dispatchEvent(new CustomEvent('survei-tersimpan', { detail: s }))), 500)
+  timer = setTimeout(() => simpanSurvei(s), 500)
 }
 
 export async function kirim(s) {
@@ -320,15 +318,17 @@ export async function tampilkanForm(el, { id, surveyorId }) {
   isiFormDariRecord(form, s)
   if (hanyaBaca) form.querySelectorAll('input, select, textarea, #btn-hapus-ttd').forEach(x => { x.disabled = true })
 
+  // Indikator tampilan: autosave() menyimpan 500 ms setelah ketikan terakhir,
+  // jadi 700 ms setelah itu draf dipastikan sudah ada di IndexedDB.
+  let timerIndikator
   const tandaiPerubahan = () => {
     statusAutosave.textContent = 'Menyimpan draf…'
     autosave(s)
+    clearTimeout(timerIndikator)
+    timerIndikator = setTimeout(() => {
+      statusAutosave.textContent = `Draf tersimpan ${formatTanggal(s.updatedAt)}`
+    }, 700)
   }
-  const saatTersimpan = e => {
-    if (e.detail.id !== s.id) return
-    statusAutosave.textContent = `Draf tersimpan ${formatTanggal(s.updatedAt)}`
-  }
-  document.addEventListener('survei-tersimpan', saatTersimpan)
   if (s.updatedAt) statusAutosave.textContent = `Terakhir disimpan ${formatTanggal(s.updatedAt)}`
 
   if (!hanyaBaca) {
@@ -344,7 +344,7 @@ export async function tampilkanForm(el, { id, surveyorId }) {
   el.querySelector('#btn-hapus-ttd').addEventListener('click', () => ttd?.hapus())
 
   const keluar = () => {
-    document.removeEventListener('survei-tersimpan', saatTersimpan)
+    clearTimeout(timerIndikator)
     tampilkanLayar('beranda')
   }
   el.querySelector('#btn-kembali').addEventListener('click', keluar)
@@ -362,6 +362,12 @@ export async function tampilkanForm(el, { id, surveyorId }) {
     const tombol = form.querySelector('#btn-kirim')
     tombol.disabled = true
     try {
+      // Aturan tabel panduan: jarak ke tiang harus angka >= 0 (dicek lewat atribut min input)
+      const inputJarak = form.querySelector('[name="teknis.jarakTiangM"]')
+      if (inputJarak.validity.rangeUnderflow || inputJarak.validity.badInput) {
+        tampilkanGalat(form, { jarak: 'Jarak harus angka 0 atau lebih' })
+        return
+      }
       const err = await kirim(s)
       tampilkanGalat(form, err)
       if (err) return
