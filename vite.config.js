@@ -13,8 +13,10 @@ const BASE = process.env.BASE_PATH || '/'
 
 export default defineConfig({
   base: BASE,
-  server: { host: true, allowedHosts: true, proxy: proxyApi },
-  preview: { host: true, allowedHosts: true, proxy: proxyApi },
+  // cors: false -> preflight OPTIONS diteruskan ke API (yang punya aturan CORS sendiri),
+  // bukan dijawab Vite; perlu saat aplikasi di origin lain (mis. GitHub Pages) memakai API lewat tunnel ini
+  server: { host: true, allowedHosts: true, cors: false, proxy: proxyApi },
+  preview: { host: true, allowedHosts: true, cors: false, proxy: proxyApi },
   plugins: [
     VitePWA({
       registerType: 'autoUpdate',
