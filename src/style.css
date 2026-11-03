@@ -314,3 +314,5 @@ input:disabled, select:disabled, textarea:disabled { background: var(--abu); col
 }
 
 #status-gps { margin-top: 8px; }
+
+.galat-info { background: #ffebee; color: var(--merah); margin-bottom: 8px; }

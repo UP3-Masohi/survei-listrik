@@ -2,6 +2,7 @@ import './style.css'
 import { registerSW } from 'virtual:pwa-register'
 import { db } from './db.js'
 import { tampilkanForm, LABEL_STATUS, formatTanggal } from './form.js'
+import { tampilkanJumlahPending } from './sync.js'
 
 // Minta penyimpanan permanen agar browser tidak menghapus data saat memori HP penuh
 if (navigator.storage?.persist) navigator.storage.persist()
@@ -30,13 +31,6 @@ export function tampilkanNotifikasi(pesan, { label, aksi, durasiMs = 4000 } = {}
   }
 }
 
-// ---------- Badge jumlah menunggu kirim ----------
-// Sementara; pada Langkah 6 digantikan tampilkanJumlahPending() dari sync.js
-export async function perbaruiBadge() {
-  const n = await db.outbox.count()
-  document.getElementById('badge-pending').textContent = n ? `${n} menunggu kirim` : 'Semua terkirim'
-}
-
 // ---------- Service worker ----------
 const perbaruiSW = registerSW({
   immediate: true,
@@ -56,6 +50,7 @@ const perbaruiSW = registerSW({
 // ---------- Navigasi antar layar ----------
 const layar = {}
 const elApp = document.getElementById('app')
+let layarAktif = null
 
 export function daftarkanLayar(nama, render) {
   layar[nama] = render
@@ -64,10 +59,16 @@ export function daftarkanLayar(nama, render) {
 export async function tampilkanLayar(nama, params = {}) {
   const render = layar[nama]
   if (!render) throw new Error(`Layar "${nama}" belum terdaftar`)
+  layarAktif = nama
   elApp.innerHTML = ''
   await render(elApp, params)
   window.scrollTo(0, 0)
 }
+
+// Setelah antrian diproses, segarkan daftar agar status "Terkirim" langsung terlihat
+document.addEventListener('sync-selesai', () => {
+  if (layarAktif === 'beranda') tampilkanLayar('beranda')
+})
 
 // ---------- Beranda: daftar survei ----------
 daftarkanLayar('beranda', async (el) => {
@@ -107,5 +108,5 @@ daftarkanLayar('beranda', async (el) => {
 
 daftarkanLayar('form', tampilkanForm)
 
-perbaruiBadge()
+tampilkanJumlahPending()
 tampilkanLayar('beranda')

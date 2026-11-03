@@ -1,6 +1,7 @@
 import { v4 as uuid } from 'uuid'
 import { db, simpanSurvei } from './db.js'
-import { tampilkanLayar, tampilkanNotifikasi, perbaruiBadge } from './main.js'
+import { tampilkanLayar, tampilkanNotifikasi } from './main.js'
+import { tampilkanJumlahPending, kirimUlang, ambilGalatTerakhir } from './sync.js'
 import { JENIS_FOTO, muatPratinjau, pasangInputFoto } from './camera.js'
 import { ambilLokasi, tampilkanPeta, pesanGalatLokasi } from './geo.js'
 
@@ -84,7 +85,9 @@ function templateForm(s, hanyaBaca) {
       <button type="button" class="tautan" id="btn-kembali">‹ Daftar survei</button>
       <span class="status status-${s.status}">${LABEL_STATUS[s.status]}</span>
     </div>
-    ${hanyaBaca ? '<p class="info">Survei ini sudah terkirim dan tidak bisa diubah.</p>' : ''}
+    ${s.status === 'sent' ? '<p class="info">Survei ini sudah terkirim dan tidak bisa diubah.</p>' : ''}
+    ${s.status === 'pending' ? '<p class="info">Survei ini menunggu kirim dan tidak bisa diubah lagi.</p>' : ''}
+    ${s.status === 'failed' ? '<p class="info galat-info" id="info-gagal">Pengiriman gagal setelah beberapa percobaan.</p>' : ''}
     <form id="form-survei" novalidate ${hanyaBaca ? 'class="hanya-baca"' : ''}>
       <p class="galat-ringkasan" id="galat-ringkasan" hidden></p>
 
@@ -189,7 +192,7 @@ function templateForm(s, hanyaBaca) {
 
       <p class="autosave" id="status-autosave"></p>
       <div class="aksi" ${hanyaBaca ? 'hidden' : ''}>
-        <button type="submit" class="tombol" id="btn-kirim">Simpan dan kirim</button>
+        <button type="submit" class="tombol" id="btn-kirim">${s.status === 'failed' ? 'Kirim ulang' : 'Simpan dan kirim'}</button>
         <button type="button" class="tombol sekunder" id="btn-draf">Simpan draf</button>
       </div>
     </form>
@@ -323,7 +326,8 @@ export async function tampilkanForm(el, { id, surveyorId }) {
     tampilkanNotifikasi('Survei tidak ditemukan')
     return tampilkanLayar('beranda')
   }
-  const hanyaBaca = s.status === 'sent'
+  const hanyaBaca = s.status === 'sent' || s.status === 'pending'   // status hanya bergerak maju
+  const statusAwal = s.status
 
   el.innerHTML = templateForm(s, hanyaBaca)
   const form = el.querySelector('#form-survei')
@@ -356,8 +360,19 @@ export async function tampilkanForm(el, { id, surveyorId }) {
   const ttd = pasangTandaTangan(el.querySelector('#ttd'), s, { hanyaBaca, onUbah: tandaiPerubahan })
   el.querySelector('#btn-hapus-ttd').addEventListener('click', () => ttd?.hapus())
 
+  if (statusAwal === 'failed') {
+    const antrian = await ambilGalatTerakhir(s.id)
+    if (antrian?.lastError) {
+      el.querySelector('#info-gagal').textContent =
+        `Pengiriman gagal ${antrian.attempts} kali. Galat terakhir: ${antrian.lastError}. Periksa data lalu tekan "Kirim ulang".`
+    }
+  }
+
   // ---- Foto (Langkah 4) ----
-  await muatPratinjau(form, s.id)
+  const jumlahFoto = await muatPratinjau(form, s.id)
+  if (statusAwal === 'sent' && jumlahFoto === 0) {
+    form.querySelectorAll('.foto-ket').forEach(el => { el.textContent = 'Terkirim, sudah dihapus dari HP' })
+  }
   if (!hanyaBaca) {
     pasangInputFoto(form, s, () => {
       form.querySelector('.galat[data-galat="foto"]').textContent = ''
@@ -438,7 +453,8 @@ export async function tampilkanForm(el, { id, surveyorId }) {
       const err = await kirim(s)
       tampilkanGalat(form, err)
       if (err) return
-      await perbaruiBadge()
+      if (statusAwal === 'failed') await kirimUlang(s.id)   // attempts kembali 0, lalu coba kirim
+      await tampilkanJumlahPending()
       tampilkanNotifikasi('Survei disimpan, menunggu kirim')
       keluar()
     } finally {
