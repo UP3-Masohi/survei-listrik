@@ -1,5 +1,7 @@
 // API dengan pool tiruan di port 3000, untuk mencoba PWA tanpa PostgreSQL.
 // Akun: surveyor1 / rahasia123 (surveyor), admin / admin123 (admin). Jalankan: node test/server-tiruan.mjs
+// PIN uji yang dipakai di browser pane saat pengembangan: 654321 (sesi admin), 123456 (sesi surveyor).
+// PIN hanya tersimpan di HP/browser masing-masing; lupa PIN -> "Masuk dengan akun lain" di layar PIN, lalu buat PIN baru.
 import { buatApp } from '../src/app.js'
 import { buatPoolTiruan } from './pool-tiruan.mjs'
 
