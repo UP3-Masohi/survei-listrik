@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: survei
+      POSTGRES_USER: survei
+      POSTGRES_PASSWORD: survei
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U survei -d survei"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "5432:5432"
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://survei:survei@db:5432/survei
+      JWT_SECRET: ${JWT_SECRET:-ganti-dengan-rahasia-acak-yang-panjang}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173,http://localhost:4173}
+      FOTO_DIR: /data/foto
+      PORT: 3000
+    volumes:
+      - foto:/data/foto
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  foto:

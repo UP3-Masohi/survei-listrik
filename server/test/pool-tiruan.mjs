@@ -1,0 +1,37 @@
+// Pool PostgreSQL tiruan di memori untuk uji tanpa database: mengenali query dari teks SQL-nya.
+import bcrypt from 'bcryptjs'
+
+export async function buatPoolTiruan() {
+  const surveyorId = '11111111-1111-4111-8111-111111111111'
+  const tabel = {
+    surveyors: [{ id: surveyorId, nama: 'Surveyor Uji', username: 'surveyor1', password_hash: await bcrypt.hash('rahasia123', 4), role: 'surveyor' },
+                { id: '22222222-2222-4222-8222-222222222222', nama: 'Admin', username: 'admin', password_hash: await bcrypt.hash('admin123', 4), role: 'admin' }],
+    surveys: new Map(),
+    photos: new Map()
+  }
+  const log = []
+  const pool = {
+    async query(sql, params = []) {
+      log.push(sql.trim().split('\n')[0].slice(0, 40))
+      if (sql.includes('FROM surveyors WHERE username')) return { rows: tabel.surveyors.filter(s => s.username === params[0]) }
+      if (sql.includes('INSERT INTO surveys')) {
+        const [id, surveyor_id, data, lat, lng, accuracy_m, created_at] = params
+        const lama = tabel.surveys.get(id)
+        tabel.surveys.set(id, { id, surveyor_id: lama?.surveyor_id ?? surveyor_id, data, lat, lng, accuracy_m, created_at, received_at: lama?.received_at ?? new Date().toISOString() })
+        return { rowCount: 1, rows: [] }
+      }
+      if (sql.includes('SELECT 1 FROM surveys')) { const s = tabel.surveys.get(params[0]); return { rowCount: s && s.surveyor_id === params[1] ? 1 : 0, rows: [] } }
+      if (sql.includes('INSERT INTO photos')) { const [survey_id, type, path, size] = params; tabel.photos.set(`${survey_id}-${type}`, { survey_id, type, path, size }); return { rowCount: 1, rows: [] } }
+      if (sql.includes('FROM surveys s')) {
+        const rows = [...tabel.surveys.values()].map(s => ({ ...s, surveyor: tabel.surveyors.find(u => u.id === s.surveyor_id)?.nama,
+          photos: [...tabel.photos.values()].filter(p => p.survey_id === s.id).map(p => ({ type: p.type, size: p.size })) }))
+        return { rows }
+      }
+      throw new Error('query tidak dikenal: ' + sql.slice(0, 60))
+    }
+  }
+  const disk = new Map()
+  const simpanKeStorage = async (path, buf) => { disk.set(path, buf.length) }
+
+  return { pool, tabel, disk, simpanKeStorage, surveyorId }
+}
