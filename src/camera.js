@@ -34,9 +34,18 @@ function tampilkanPratinjau(root, tipe, url, size) {
   if (urlAktif[tipe]) URL.revokeObjectURL(urlAktif[tipe])
   urlAktif[tipe] = url
   const img = root.querySelector(`#pratinjau-${tipe}`)
-  if (img) { img.src = url; img.hidden = false }
+  if (img) {
+    img.src = url
+    img.hidden = false
+    const tile = img.closest('.foto-tile')
+    if (tile) {
+      tile.classList.add('ada')
+      const cek = tile.querySelector('.cek')
+      if (cek) cek.hidden = false
+    }
+  }
   const ket = root.querySelector(`[data-ket-foto="${tipe}"]`)
-  if (ket) ket.textContent = `Tersimpan, ${Math.round(size / 1024)} KB`
+  if (ket) ket.textContent = `${Math.round(size / 1024)} KB`
 }
 
 // Tampilkan foto yang sudah ada di IndexedDB (saat draf dibuka kembali)

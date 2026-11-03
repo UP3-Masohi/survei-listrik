@@ -1,5 +1,5 @@
 import { db } from './db.js'
-import { tampilkanLayar, tampilkanNotifikasi } from './main.js'
+import { tampilkanLayar, tampilkanNotifikasi, layarUtama, ikon } from './main.js'
 
 const BASE = import.meta.env.VITE_API_URL
 const MAKS_SALAH_PIN = 5
@@ -127,6 +127,13 @@ export async function dekripsi(paket) { return JSON.parse(dec.decode(await dekri
 
 // ===================== Layar login dan PIN =====================
 
+const hero = (judul, sub) => `
+  <div class="masuk-hero">
+    <div class="logo-besar">${ikon('petir')}</div>
+    <h2>${judul}</h2>
+    <p>${sub}</p>
+  </div>`
+
 function inputPin(id, label) {
   return `
     <label class="field">
@@ -136,20 +143,29 @@ function inputPin(id, label) {
     </label>`
 }
 
+const titikPin = () => `<div class="pin-titik" aria-hidden="true">${'<span></span>'.repeat(6)}</div>`
+function ikatTitik(input, wadah) {
+  const titik = wadah.querySelectorAll('.pin-titik span')
+  input.addEventListener('input', () => titik.forEach((t, i) => t.classList.toggle('isi', i < input.value.length)))
+}
+
 export function tampilkanLogin(el, { pesan } = {}) {
   el.innerHTML = `
-    <section class="kartu">
-      <h2>Masuk</h2>
-      <p>${pesan || 'Login membutuhkan koneksi internet. Setelah itu aplikasi bisa dipakai tanpa sinyal dengan PIN.'}</p>
-      <form id="form-login" novalidate>
-        <label class="field"><span>Username</span>
-          <input name="username" type="text" autocomplete="username" autocapitalize="none" required></label>
-        <label class="field"><span>Password</span>
-          <input name="password" type="password" autocomplete="current-password" required></label>
-        <small class="galat" id="galat-login"></small>
-        <button type="submit" class="tombol" id="btn-login">Masuk</button>
-      </form>
-    </section>`
+    <div class="masuk-wadah">
+      ${hero('Survei Listrik', 'Survei calon pelanggan, bekerja tanpa sinyal')}
+      <section class="kartu">
+        <h2>Masuk</h2>
+        <p>${pesan || 'Login membutuhkan koneksi internet. Setelah itu aplikasi bisa dipakai tanpa sinyal dengan PIN.'}</p>
+        <form id="form-login" novalidate>
+          <label class="field"><span>Username</span>
+            <input name="username" type="text" autocomplete="username" autocapitalize="none" required></label>
+          <label class="field"><span>Password</span>
+            <input name="password" type="password" autocomplete="current-password" required></label>
+          <small class="galat" id="galat-login"></small>
+          <button type="submit" class="tombol" id="btn-login" style="margin-top:14px">Masuk</button>
+        </form>
+      </section>
+    </div>`
   const form = el.querySelector('#form-login')
   const galat = el.querySelector('#galat-login')
   if (!navigator.onLine) galat.textContent = 'Anda sedang offline. Sambungkan internet untuk masuk.'
@@ -176,17 +192,18 @@ export function tampilkanLogin(el, { pesan } = {}) {
 
 export function tampilkanBuatPin(el) {
   el.innerHTML = `
-    <section class="kartu">
-      <h2>Buat PIN</h2>
-      <p>PIN 6 digit dipakai untuk membuka aplikasi tanpa sinyal dan mengunci data survei di HP ini.
-         Salah 5 kali berturut-turut, data lokal dihapus dan Anda harus login ulang.</p>
-      <form id="form-pin" novalidate>
-        ${inputPin('pin1', 'PIN baru (6 digit)')}
-        ${inputPin('pin2', 'Ulangi PIN')}
-        <small class="galat" id="galat-pin"></small>
-        <button type="submit" class="tombol">Simpan PIN</button>
-      </form>
-    </section>`
+    <div class="masuk-wadah">
+      ${hero('Buat PIN', 'PIN 6 digit untuk membuka aplikasi tanpa sinyal')}
+      <section class="kartu">
+        <p>PIN mengunci data survei di HP ini. Salah 5 kali berturut-turut, data lokal dihapus dan Anda harus login ulang.</p>
+        <form id="form-pin" novalidate>
+          ${inputPin('pin1', 'PIN baru (6 digit)')}
+          ${inputPin('pin2', 'Ulangi PIN')}
+          <small class="galat" id="galat-pin"></small>
+          <button type="submit" class="tombol" style="margin-top:14px">Simpan PIN</button>
+        </form>
+      </section>
+    </div>`
   const form = el.querySelector('#form-pin')
   const galat = el.querySelector('#galat-pin')
   form.addEventListener('submit', async e => {
@@ -197,33 +214,47 @@ export function tampilkanBuatPin(el) {
     if (pin1 !== pin2) { galat.textContent = 'PIN tidak sama.'; return }
     await buatPin(pin1)
     tampilkanNotifikasi('PIN tersimpan')
-    tampilkanLayar('beranda')
+    tampilkanLayar(layarUtama())
   })
 }
 
 export function tampilkanPin(el) {
   const surveyor = getSurveyor()
   el.innerHTML = `
-    <section class="kartu">
-      <h2>Masukkan PIN</h2>
-      <p>${surveyor ? `Masuk sebagai <strong>${surveyor.nama}</strong>. ` : ''}Ketik PIN 6 digit untuk membuka aplikasi.</p>
-      <form id="form-pin" novalidate>
-        ${inputPin('pin', 'PIN')}
-        <small class="galat" id="galat-pin"></small>
-        <button type="submit" class="tombol">Buka</button>
-      </form>
-    </section>`
+    <div class="masuk-wadah">
+      ${hero('Masukkan PIN', surveyor ? `Masuk sebagai ${surveyor.nama}` : 'Ketik PIN 6 digit untuk membuka aplikasi')}
+      <section class="kartu">
+        <form id="form-pin" novalidate>
+          ${titikPin()}
+          ${inputPin('pin', 'PIN')}
+          <small class="galat" id="galat-pin"></small>
+          <button type="submit" class="tombol" style="margin-top:14px">Buka</button>
+        </form>
+      </section>
+      <p style="text-align:center"><button type="button" class="tautan" id="btn-ganti-akun">Masuk dengan akun lain</button></p>
+    </div>`
   const form = el.querySelector('#form-pin')
   const galat = el.querySelector('#galat-pin')
   const input = form.querySelector('#pin')
+  ikatTitik(input, form)
+  el.querySelector('#btn-ganti-akun').addEventListener('click', async () => {
+    const antri = await db.outbox.count()
+    const pesan = antri
+      ? `Masih ada ${antri} survei yang belum terkirim. Keluar sekarang akan MENGHAPUS semuanya dari HP ini. Lanjutkan?`
+      : 'Keluar akan menghapus sesi dan data survei di HP ini. Lanjutkan?'
+    if (!confirm(pesan)) return
+    await hapusDataLokal()
+    tampilkanLayar('login')
+  })
   input.focus()
   form.addEventListener('submit', async e => {
     e.preventDefault()
     const pin = input.value
     if (!/^\d{6}$/.test(pin)) { galat.textContent = 'PIN harus 6 digit angka.'; return }
     const hasil = await bukaDenganPin(pin)
-    if (hasil.ok) return tampilkanLayar('beranda')
+    if (hasil.ok) return tampilkanLayar(layarUtama())
     input.value = ''
+    input.dispatchEvent(new Event('input'))
     if (hasil.dihapus) {
       tampilkanNotifikasi('PIN salah 5 kali. Data lokal dihapus, silakan login ulang.', { durasiMs: 8000 })
       return tampilkanLayar('login')

@@ -42,6 +42,7 @@ export async function jalankanSync() {
 export async function tampilkanJumlahPending() {
   const n = await db.outbox.count()
   document.getElementById('badge-pending').textContent = n ? `${n} menunggu kirim` : 'Semua terkirim'
+  document.getElementById('badge-pending').classList.toggle('ada-antrian', n > 0)
 }
 
 // Survei berstatus failed: kembalikan attempts ke 0 dan status ke pending, lalu coba kirim lagi

@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid'
 import { db, simpanSurvei, bacaSurvei } from './db.js'
-import { tampilkanLayar, tampilkanNotifikasi } from './main.js'
+import { tampilkanLayar, tampilkanNotifikasi, ikon } from './main.js'
 import { tampilkanJumlahPending, kirimUlang, ambilGalatTerakhir, jalankanSync } from './sync.js'
 import { JENIS_FOTO, muatPratinjau, pasangInputFoto } from './camera.js'
 import { ambilLokasi, tampilkanPeta, pesanGalatLokasi } from './geo.js'
@@ -80,26 +80,31 @@ function templateForm(s, hanyaBaca) {
        <input name="${name}" ${atribut}>
        <small class="galat" data-galat="${galat || name.split('.').pop()}"></small>
      </label>`
+  const legenda = (nomor, judul) => `<legend><span class="nomor">${nomor}</span>${judul}</legend>`
   return `
     <div class="form-atas">
-      <button type="button" class="tautan" id="btn-kembali">‹ Daftar survei</button>
+      <button type="button" class="tautan" id="btn-kembali">${ikon('kembali')}Daftar survei</button>
       <span class="status status-${s.status}">${LABEL_STATUS[s.status]}</span>
     </div>
-    ${s.status === 'sent' ? '<p class="info">Survei ini sudah terkirim dan tidak bisa diubah.</p>' : ''}
     ${s.status === 'pending' ? '<p class="info">Survei ini menunggu kirim dan tidak bisa diubah lagi.</p>' : ''}
-    ${s.status === 'failed' ? '<p class="info galat-info" id="info-gagal">Pengiriman gagal setelah beberapa percobaan.</p>' : ''}
+    ${s.status === 'failed' ? `<p class="galat-info" id="info-gagal">${ikon('peringatan')}<span>Pengiriman gagal setelah beberapa percobaan.</span></p>` : ''}
     <form id="form-survei" novalidate ${hanyaBaca ? 'class="hanya-baca"' : ''}>
+      ${hanyaBaca ? '' : `
+      <div class="progres" id="progres">
+        <div class="progres-teks"><span>Kelengkapan survei</span><strong id="progres-teks">0 dari 10</strong></div>
+        <div class="progres-bar"><div class="progres-isi" id="progres-isi"></div></div>
+      </div>`}
       <p class="galat-ringkasan" id="galat-ringkasan" hidden></p>
 
       <fieldset class="kartu">
-        <legend>Data pelanggan</legend>
-        ${field('Nama lengkap', 'pelanggan.nama', 'type="text" autocomplete="name"')}
-        ${field('NIK', 'pelanggan.nik', 'type="text" inputmode="numeric" maxlength="16" pattern="\\d{16}"')}
-        ${field('No. KK', 'pelanggan.noKK', 'type="text" inputmode="numeric" maxlength="16" pattern="\\d{16}"')}
+        ${legenda(1, 'Data pelanggan')}
+        ${field('Nama lengkap', 'pelanggan.nama', 'type="text" autocomplete="name" placeholder="Sesuai KTP"')}
+        ${field('NIK', 'pelanggan.nik', 'type="text" inputmode="numeric" maxlength="16" pattern="\\d{16}" placeholder="16 digit"')}
+        ${field('No. KK', 'pelanggan.noKK', 'type="text" inputmode="numeric" maxlength="16" pattern="\\d{16}" placeholder="16 digit"')}
         ${field('No. HP', 'pelanggan.noHp', 'type="text" inputmode="numeric" maxlength="13" placeholder="08…"')}
         <label class="field">
           <span>Alamat</span>
-          <textarea name="pelanggan.alamat" rows="2"></textarea>
+          <textarea name="pelanggan.alamat" rows="2" placeholder="Jalan, nomor rumah, patokan"></textarea>
           <small class="galat" data-galat="alamat"></small>
         </label>
         <div class="baris-2">
@@ -111,7 +116,7 @@ function templateForm(s, hanyaBaca) {
       </fieldset>
 
       <fieldset class="kartu">
-        <legend>Permohonan</legend>
+        ${legenda(2, 'Permohonan')}
         <label class="field">
           <span>Daya yang diajukan (VA)</span>
           <select name="permohonan.dayaVA">
@@ -139,7 +144,7 @@ function templateForm(s, hanyaBaca) {
       </fieldset>
 
       <fieldset class="kartu">
-        <legend>Data teknis</legend>
+        ${legenda(3, 'Data teknis')}
         ${field('Jarak ke tiang terdekat (meter)', 'teknis.jarakTiangM', 'type="number" inputmode="decimal" min="0" step="1"', 'jarak')}
         <label class="centang">
           <input type="checkbox" name="teknis.perluTiangBaru">
@@ -147,37 +152,40 @@ function templateForm(s, hanyaBaca) {
         </label>
         <label class="field">
           <span>Catatan</span>
-          <textarea name="teknis.catatan" rows="2"></textarea>
+          <textarea name="teknis.catatan" rows="2" placeholder="Kondisi jaringan, akses, dan lain-lain"></textarea>
         </label>
       </fieldset>
 
       <fieldset class="kartu">
-        <legend>Bukti</legend>
+        ${legenda(4, 'Foto dan lokasi')}
         <div class="field">
           <span>Foto KTP, KK, dan tampak depan rumah</span>
           <div class="foto-grid">
             ${JENIS_FOTO.map(([tipe, label]) => `
             <div class="foto-blok">
-              <img id="pratinjau-${tipe}" alt="" hidden>
-              <label class="tombol sekunder foto-tombol">${label}
+              <label class="foto-tile" title="${label}">
                 <input type="file" accept="image/*" capture="environment" data-tipe="${tipe}" hidden>
+                ${ikon('kamera')}
+                <img id="pratinjau-${tipe}" alt="" hidden>
+                <span class="cek" hidden>${ikon('cek')}</span>
               </label>
-              <small class="foto-ket" data-ket-foto="${tipe}">Belum ada foto</small>
+              <span class="foto-label">${label.replace('Foto ', '').replace('tampak depan rumah', 'Rumah')}</span>
+              <small class="foto-ket" data-ket-foto="${tipe}">Belum ada</small>
             </div>`).join('')}
           </div>
           <small class="galat" data-galat="foto"></small>
         </div>
         <div class="field">
           <span>Lokasi rumah</span>
-          <button type="button" class="tombol sekunder" id="btn-gps">Ambil lokasi GPS</button>
-          <p class="info" id="status-gps">Belum ada titik lokasi.</p>
+          <button type="button" class="tombol sekunder" id="btn-gps">${ikon('lokasi')}<span>Ambil lokasi GPS</span></button>
+          <p class="info" id="status-gps">Belum ada titik lokasi. GPS bekerja tanpa internet.</p>
           <div id="peta" class="peta" hidden></div>
           <small class="galat" data-galat="lokasi"></small>
         </div>
       </fieldset>
 
       <fieldset class="kartu">
-        <legend>Persetujuan pelanggan</legend>
+        ${legenda(5, 'Persetujuan pelanggan')}
         <label class="centang">
           <input type="checkbox" name="persetujuan.setuju">
           <span>Saya setuju data saya dipakai untuk permohonan sambungan listrik</span>
@@ -192,11 +200,25 @@ function templateForm(s, hanyaBaca) {
 
       <p class="autosave" id="status-autosave"></p>
       <div class="aksi" ${hanyaBaca ? 'hidden' : ''}>
-        <button type="submit" class="tombol" id="btn-kirim">${s.status === 'failed' ? 'Kirim ulang' : 'Simpan dan kirim'}</button>
-        <button type="button" class="tombol sekunder" id="btn-draf">Simpan draf</button>
+        <button type="submit" class="tombol" id="btn-kirim">${ikon('kirim')}<span>${s.status === 'failed' ? 'Kirim ulang' : 'Simpan dan kirim'}</span></button>
+        <button type="button" class="tombol sekunder" id="btn-draf">${ikon('simpan')}<span>Draf</span></button>
       </div>
     </form>
   `
+}
+
+// Kelengkapan: 10 hal wajib (7 field + 3 foto); lokasi dihitung satu, tanda tangan tidak wajib
+export function hitungKelengkapan(s, jumlahFoto) {
+  const wajib = [
+    !!s.pelanggan.nama?.trim(),
+    /^\d{16}$/.test(s.pelanggan.nik ?? ''),
+    /^\d{16}$/.test(s.pelanggan.noKK ?? ''),
+    /^08\d{8,11}$/.test(s.pelanggan.noHp ?? ''),
+    !!s.permohonan.dayaVA,
+    !!s.lokasi?.lat,
+    !!s.persetujuan.setuju
+  ]
+  return { terisi: wajib.filter(Boolean).length + Math.min(3, jumlahFoto), total: 10 }
 }
 
 // ===================== Pengikatan data =====================
@@ -330,7 +352,7 @@ export async function tampilkanForm(el, { id, surveyorId }) {
     // Isi form dan foto sudah dihapus dari HP setelah server mengonfirmasi (Langkah 8)
     el.innerHTML = `
       <div class="form-atas">
-        <button type="button" class="tautan" id="btn-kembali">‹ Daftar survei</button>
+        <button type="button" class="tautan" id="btn-kembali">${ikon('kembali')}Daftar survei</button>
         <span class="status status-sent">${LABEL_STATUS.sent}</span>
       </div>
       <section class="kartu">
@@ -356,7 +378,16 @@ export async function tampilkanForm(el, { id, surveyorId }) {
   // Indikator tampilan: autosave() menyimpan 500 ms setelah ketikan terakhir,
   // jadi 700 ms setelah itu draf dipastikan sudah ada di IndexedDB.
   let timerIndikator
+  const perbaruiProgres = () => {
+    const isi = el.querySelector('#progres-isi')
+    if (!isi) return
+    const { terisi, total } = hitungKelengkapan(s, form.querySelectorAll('.foto-tile.ada').length)
+    el.querySelector('#progres-teks').textContent = `${terisi} dari ${total}`
+    isi.style.width = `${Math.round(terisi / total * 100)}%`
+    isi.classList.toggle('lengkap', terisi === total)
+  }
   const tandaiPerubahan = () => {
+    perbaruiProgres()
     statusAutosave.textContent = 'Menyimpan draf…'
     autosave(s)
     clearTimeout(timerIndikator)
@@ -365,6 +396,7 @@ export async function tampilkanForm(el, { id, surveyorId }) {
     }, 700)
   }
   if (s.updatedAt) statusAutosave.textContent = `Terakhir disimpan ${formatTanggal(s.updatedAt)}`
+  perbaruiProgres()
 
   if (!hanyaBaca) {
     form.addEventListener('input', e => {
@@ -381,19 +413,18 @@ export async function tampilkanForm(el, { id, surveyorId }) {
   if (statusAwal === 'failed') {
     const antrian = await ambilGalatTerakhir(s.id)
     if (antrian?.lastError) {
-      el.querySelector('#info-gagal').textContent =
+      el.querySelector('#info-gagal span').textContent =
         `Pengiriman gagal ${antrian.attempts} kali. Galat terakhir: ${antrian.lastError}. Periksa data lalu tekan "Kirim ulang".`
     }
   }
 
   // ---- Foto (Langkah 4) ----
-  const jumlahFoto = await muatPratinjau(form, s.id)
-  if (statusAwal === 'sent' && jumlahFoto === 0) {
-    form.querySelectorAll('.foto-ket').forEach(el => { el.textContent = 'Terkirim, sudah dihapus dari HP' })
-  }
+  await muatPratinjau(form, s.id)
+  perbaruiProgres()
   if (!hanyaBaca) {
     pasangInputFoto(form, s, () => {
       form.querySelector('.galat[data-galat="foto"]').textContent = ''
+      perbaruiProgres()
     })
   }
 
@@ -425,22 +456,22 @@ export async function tampilkanForm(el, { id, surveyorId }) {
 
   btnGps.addEventListener('click', async () => {
     btnGps.disabled = true
-    btnGps.textContent = 'Mencari sinyal GPS…'
+    btnGps.querySelector('span').textContent = 'Mencari sinyal GPS…'
     statusGps.textContent = 'Mencari sinyal GPS, biasanya 5–20 detik. Tetap di tempat terbuka.'
     try {
       s.lokasi = await ambilLokasi()
       form.querySelector('.galat[data-galat="lokasi"]').textContent = ''
       gambarPeta()
       tandaiPerubahan()
-      btnGps.textContent = 'Ambil ulang lokasi'
+      btnGps.querySelector('span').textContent = 'Ambil ulang lokasi'
     } catch (e) {
       statusGps.textContent = `${pesanGalatLokasi(e).replace(/\.?$/, '.')} Tekan "Coba lagi".`
-      btnGps.textContent = 'Coba lagi'
+      btnGps.querySelector('span').textContent = 'Coba lagi'
     } finally {
       btnGps.disabled = false
     }
   })
-  if (s.lokasi) btnGps.textContent = 'Ambil ulang lokasi'
+  if (s.lokasi) btnGps.querySelector('span').textContent = 'Ambil ulang lokasi'
 
   const keluar = () => {
     clearTimeout(timerIndikator)
