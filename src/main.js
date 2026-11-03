@@ -1,8 +1,13 @@
 import './style.css'
 import { registerSW } from 'virtual:pwa-register'
+import { db } from './db.js'
+import { tampilkanForm, LABEL_STATUS, formatTanggal } from './form.js'
 
 // Minta penyimpanan permanen agar browser tidak menghapus data saat memori HP penuh
 if (navigator.storage?.persist) navigator.storage.persist()
+
+// Sementara: ID surveyor tetap; diganti oleh auth.js pada Langkah 8
+const SURVEYOR_ID = 'u-lokal'
 
 // ---------- Notifikasi kecil di bawah layar ----------
 const elNotif = document.getElementById('notifikasi')
@@ -23,6 +28,13 @@ export function tampilkanNotifikasi(pesan, { label, aksi, durasiMs = 4000 } = {}
   if (durasiMs > 0) {
     tampilkanNotifikasi._timer = setTimeout(() => { elNotif.hidden = true }, durasiMs)
   }
+}
+
+// ---------- Badge jumlah menunggu kirim ----------
+// Sementara; pada Langkah 6 digantikan tampilkanJumlahPending() dari sync.js
+export async function perbaruiBadge() {
+  const n = await db.outbox.count()
+  document.getElementById('badge-pending').textContent = n ? `${n} menunggu kirim` : 'Semua terkirim'
 }
 
 // ---------- Service worker ----------
@@ -57,35 +69,43 @@ export async function tampilkanLayar(nama, params = {}) {
   window.scrollTo(0, 0)
 }
 
-// ---------- Layar awal (sementara, diganti pada langkah berikutnya) ----------
-daftarkanLayar('beranda', (el) => {
-  const dukung = (ok) => ok
-    ? '<span class="ya">tersedia</span>'
-    : '<span class="tidak">tidak tersedia</span>'
+// ---------- Beranda: daftar survei ----------
+daftarkanLayar('beranda', async (el) => {
+  const daftar = await db.surveys.orderBy('createdAt').reverse().toArray()
   el.innerHTML = `
-    <section class="kartu">
-      <h2>Kerangka PWA siap</h2>
-      <p>Aplikasi ini bisa dipasang ke layar utama dan terbuka tanpa sinyal.
-         Form survei, foto, GPS, dan sinkronisasi ditambahkan pada langkah berikutnya.</p>
-    </section>
-    <section class="kartu">
-      <h2>Dukungan perangkat</h2>
-      <div class="status-baris"><span>Service worker</span>${dukung('serviceWorker' in navigator)}</div>
-      <div class="status-baris"><span>IndexedDB</span>${dukung('indexedDB' in window)}</div>
-      <div class="status-baris"><span>GPS</span>${dukung('geolocation' in navigator)}</div>
-      <div class="status-baris"><span>Status jaringan</span><span id="status-jaringan"></span></div>
-    </section>
+    <button type="button" class="tombol" id="btn-survei-baru">+ Survei baru</button>
+    <section class="daftar" id="daftar-survei"></section>
   `
-  const perbaruiJaringan = () => {
-    const s = el.querySelector('#status-jaringan')
-    if (s) s.innerHTML = navigator.onLine ? '<span class="ya">online</span>' : '<span class="tidak">offline</span>'
+  const wadah = el.querySelector('#daftar-survei')
+  if (!daftar.length) {
+    wadah.innerHTML = `
+      <div class="kartu kosong">
+        <p>Belum ada survei. Tekan <strong>Survei baru</strong> untuk mulai mengisi.</p>
+      </div>`
   }
-  perbaruiJaringan()
-  window.addEventListener('online', perbaruiJaringan)
-  window.addEventListener('offline', perbaruiJaringan)
+  for (const s of daftar) {
+    const item = document.createElement('button')
+    item.type = 'button'
+    item.className = 'kartu item-survei'
+    item.innerHTML = `
+      <div class="item-judul"></div>
+      <div class="item-sub"></div>
+      <div class="item-bawah">
+        <span class="item-waktu"></span>
+        <span class="status status-${s.status}">${LABEL_STATUS[s.status] ?? s.status}</span>
+      </div>`
+    item.querySelector('.item-judul').textContent = s.pelanggan?.nama?.trim() || 'Tanpa nama'
+    item.querySelector('.item-sub').textContent = [s.pelanggan?.alamat, s.pelanggan?.kelurahan]
+      .filter(Boolean).join(', ') || 'Alamat belum diisi'
+    item.querySelector('.item-waktu').textContent = formatTanggal(s.updatedAt || s.createdAt)
+    item.addEventListener('click', () => tampilkanLayar('form', { id: s.id }))
+    wadah.appendChild(item)
+  }
+  el.querySelector('#btn-survei-baru').addEventListener('click',
+    () => tampilkanLayar('form', { surveyorId: SURVEYOR_ID }))
 })
 
-// Badge sementara; diisi oleh sync.js pada Langkah 6
-document.getElementById('badge-pending').textContent = 'Belum ada survei'
+daftarkanLayar('form', tampilkanForm)
 
+perbaruiBadge()
 tampilkanLayar('beranda')
