@@ -617,3 +617,15 @@ table.tabel { width: 100%; border-collapse: collapse; font-size: 0.86rem; min-wi
 
 /* atribut hidden harus menang atas display pada kelas */
 [hidden] { display: none !important; }
+
+/* Kotak konfirmasi hapus di dasbor */
+.kotak-hapus {
+  margin: 10px 0 14px;
+  padding: 14px 16px;
+  border: 1px solid #f3b4b4;
+  border-radius: var(--radius-kecil);
+  background: var(--merah-50);
+}
+.kotak-hapus h3 { font-size: 1rem; color: var(--merah); margin-bottom: 4px; }
+.kotak-hapus p { font-size: 0.88rem; }
+.kotak-hapus .field > span { color: var(--teks); }

@@ -1,11 +1,20 @@
 import L from 'leaflet'
-import { ambilDaftarSurvei, ambilUrlFoto, hapusSurveiServer } from './api.js'
+import { ambilDaftarSurvei, ambilUrlFoto, hapusSurveiServer, ambilRiwayatHapus } from './api.js'
 import { ikon, tampilkanNotifikasi } from './main.js'
 import { formatTanggal } from './form.js'
 import { tingkatAkurasi } from './geo.js'
 
 // Dasbor admin: ringkasan, peta sebaran, tabel, detail survei beserta foto, ekspor CSV.
 // Data diambil dari GET /surveys (butuh role admin) dan tidak disimpan di HP.
+
+const ALASAN_HAPUS = [
+  'NIK atau No. KK tidak cocok dengan dokumen',
+  'Survei ganda (pelanggan sama)',
+  'Pelanggan membatalkan permohonan',
+  'Foto atau lokasi tidak sesuai',
+  'Data uji coba',
+  'Lainnya'
+]
 
 const WARNA_DAYA = [
   { maks: 900, warna: '#15803d', label: '≤ 900 VA' },
@@ -66,6 +75,16 @@ export async function tampilkanDasbor(el) {
         <div class="bar-daftar" id="bar-surveyor"></div>
       </section>
       <section class="kartu kartu-tabel" id="detail" hidden></section>
+      <section class="kartu kartu-tabel" id="riwayat-hapus" hidden>
+        <h2>Riwayat penghapusan <span id="jumlah-riwayat" style="color:var(--teks-muda);font-weight:500"></span></h2>
+        <p>Jejak audit: setiap penghapusan data pelanggan oleh admin tercatat beserta alasannya.</p>
+        <div class="tabel-wadah">
+          <table class="tabel">
+            <thead><tr><th>Waktu</th><th>Nama</th><th>Kelurahan</th><th>Surveyor</th><th>Alasan</th><th>Dihapus oleh</th></tr></thead>
+            <tbody id="riwayat-isi"></tbody>
+          </table>
+        </div>
+      </section>
       <section class="kartu kartu-tabel">
         <h2>Daftar survei <span id="jumlah-tabel" style="color:var(--teks-muda);font-weight:500"></span></h2>
         <div class="tabel-wadah">
@@ -110,6 +129,7 @@ export async function tampilkanDasbor(el) {
       pilih.innerHTML = '<option value="">Semua</option>' + dayaSet.map(d => `<option value="${d}">${d} VA</option>`).join('')
       pilih.value = dayaSet.includes(Number(nilaiLama)) ? nilaiLama : ''
       terapkan()
+      muatRiwayat()
     } catch (e) {
       q('#dasbor-sub').textContent = navigator.onLine
         ? `Gagal memuat data (${e.message}). Pastikan akun Anda admin.`
@@ -218,6 +238,24 @@ export async function tampilkanDasbor(el) {
     }))
   }
 
+  // ---------- Riwayat penghapusan (jejak audit) ----------
+  const muatRiwayat = async () => {
+    try {
+      const riwayat = await ambilRiwayatHapus()
+      const wadah = q('#riwayat-hapus')
+      wadah.hidden = riwayat.length === 0
+      q('#jumlah-riwayat').textContent = `(${riwayat.length})`
+      q('#riwayat-isi').innerHTML = riwayat.map(r => `<tr>
+        <td>${esc(formatTanggal(r.deleted_at))}</td>
+        <td class="nama">${esc(r.nama || 'Tanpa nama')}</td>
+        <td>${esc(r.kelurahan || '–')}</td>
+        <td>${esc(r.surveyor || '–')}</td>
+        <td style="white-space:normal;min-width:220px">${esc(r.alasan)}</td>
+        <td>${esc(r.admin || '–')}</td>
+      </tr>`).join('')
+    } catch { /* riwayat bersifat tambahan; dasbor tetap jalan tanpa ini */ }
+  }
+
   // ---------- Detail satu survei ----------
   const tampilkanDetail = async (s) => {
     const d = s.data ?? {}
@@ -252,18 +290,48 @@ export async function tampilkanDasbor(el) {
         ${(s.photos ?? []).map(p => `<figure><img alt="Foto ${esc(p.type)}" data-tipe="${esc(p.type)}"><figcaption>${esc(p.type.toUpperCase())} · ${Math.round((p.size ?? 0) / 1024)} KB</figcaption></figure>`).join('')}
       </div>`
     wadah.querySelector('#btn-tutup-detail').addEventListener('click', () => { wadah.hidden = true })
-    wadah.querySelector('#btn-hapus-server').addEventListener('click', async () => {
+    wadah.querySelector('#btn-hapus-server').addEventListener('click', () => {
       const nama = d.pelanggan?.nama || 'tanpa nama'
-      if (!confirm(`Hapus survei "${nama}" dari server beserta fotonya? Tindakan ini tidak bisa dibatalkan.`)) return
-      try {
-        await hapusSurveiServer(s.id)
-        semua = semua.filter(x => x.id !== s.id)
-        wadah.hidden = true
-        terapkan()
-        tampilkanNotifikasi(`Survei "${nama}" dihapus dari server`)
-      } catch (e) {
-        tampilkanNotifikasi(`Gagal menghapus (${e.message})`)
-      }
+      let kotak = wadah.querySelector('#kotak-hapus')
+      if (kotak) { kotak.hidden = false; return }
+      kotak = document.createElement('div')
+      kotak.id = 'kotak-hapus'
+      kotak.className = 'kotak-hapus'
+      kotak.innerHTML = `
+        <h3>Hapus survei "${esc(nama)}" dari server?</h3>
+        <p>Data pelanggan dan fotonya dihapus permanen. Ringkasan (nama, kelurahan, surveyor) beserta alasan
+           dan nama Anda dicatat di riwayat penghapusan.</p>
+        <label class="field"><span>Alasan</span>
+          <select id="alasan-pilih">${ALASAN_HAPUS.map(a => `<option>${esc(a)}</option>`).join('')}</select></label>
+        <label class="field"><span>Keterangan (opsional, wajib bila "Lainnya")</span>
+          <textarea id="alasan-ket" rows="2" placeholder="Contoh: NIK di KTP 3201…, di form 3202…"></textarea></label>
+        <small class="galat" id="galat-hapus"></small>
+        <div style="display:flex;gap:8px;margin-top:12px">
+          <button type="button" class="tombol kecil bahaya" id="btn-hapus-permanen">Hapus permanen</button>
+          <button type="button" class="tombol kecil ringan" id="btn-batal-hapus">Batal</button>
+        </div>`
+      wadah.querySelector('.form-atas').insertAdjacentElement('afterend', kotak)
+      kotak.querySelector('#btn-batal-hapus').addEventListener('click', () => { kotak.hidden = true })
+      kotak.querySelector('#btn-hapus-permanen').addEventListener('click', async () => {
+        const pilih = kotak.querySelector('#alasan-pilih').value
+        const ket = kotak.querySelector('#alasan-ket').value.trim()
+        const galat = kotak.querySelector('#galat-hapus')
+        if (pilih === 'Lainnya' && ket.length < 3) { galat.textContent = 'Tulis keterangan alasannya.'; return }
+        const alasan = pilih === 'Lainnya' ? ket : (ket ? `${pilih}: ${ket}` : pilih)
+        const tombol = kotak.querySelector('#btn-hapus-permanen')
+        tombol.disabled = true
+        try {
+          await hapusSurveiServer(s.id, alasan)
+          semua = semua.filter(x => x.id !== s.id)
+          wadah.hidden = true
+          terapkan()
+          muatRiwayat()
+          tampilkanNotifikasi(`Survei "${nama}" dihapus dari server`)
+        } catch (e) {
+          galat.textContent = `Gagal menghapus (${e.message}).`
+          tombol.disabled = false
+        }
+      })
     })
     wadah.scrollIntoView({ behavior: 'smooth', block: 'start' })
     for (const img of wadah.querySelectorAll('img[data-tipe]')) {

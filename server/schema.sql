@@ -25,3 +25,16 @@ CREATE TABLE photo_access_log (
   accessed_at timestamptz DEFAULT now()
 );
 CREATE INDEX photo_access_log_survey_idx ON photo_access_log (survey_id);
+
+-- Jejak audit penghapusan survei oleh admin (UU PDP): siapa, kapan, mengapa.
+-- Hanya ringkasan yang disimpan, bukan NIK/foto, agar penghapusan data pribadi tetap berarti.
+CREATE TABLE survey_deletion_log (
+  id bigserial PRIMARY KEY,
+  survey_id uuid NOT NULL,
+  nama text, kelurahan text,
+  surveyor_id uuid, surveyor text,
+  survey_created_at timestamptz,
+  alasan text NOT NULL,
+  admin_id uuid REFERENCES surveyors(id),
+  deleted_at timestamptz DEFAULT now()
+);

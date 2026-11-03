@@ -37,7 +37,16 @@ export async function ambilUrlFoto(surveyId, tipe) {
   return `${BASE}${url}`
 }
 
-export async function hapusSurveiServer(surveyId) {
-  const r = await fetch(`${BASE}/surveys/${surveyId}`, { method: 'DELETE', headers: auth() })
+export async function hapusSurveiServer(surveyId, alasan) {
+  const r = await fetch(`${BASE}/surveys/${surveyId}`, {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json', ...auth() },
+    body: JSON.stringify({ alasan })
+  })
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
+}
+
+export async function ambilRiwayatHapus() {
+  const r = await fetch(`${BASE}/deletions`, { headers: auth() })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return r.json()
 }

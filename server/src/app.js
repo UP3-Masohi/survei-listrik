@@ -74,17 +74,37 @@ export function buatApp({ pool, simpanKeStorage, bacaDariStorage, hapusDariStora
     res.json(rows)
   })
 
-  // Hapus survei yang salah input (admin): baris survei, foto, log akses, dan file fotonya
+  // Hapus survei yang tidak valid (admin), wajib alasan. Ringkasan dicatat di survey_deletion_log
+  // sebelum baris survei, foto, log akses, dan file fotonya dihapus.
   app.delete('/surveys/:id', auth, hanyaAdmin, async (req, res) => {
     const { id } = req.params
+    const alasan = String(req.body?.alasan ?? '').trim()
     if (!UUID.test(id)) return res.status(400).json({ error: 'id bukan UUID' })
-    const { rowCount } = await pool.query('SELECT 1 FROM surveys WHERE id = $1', [id])
-    if (!rowCount) return res.status(404).json({ error: 'survei tidak ada' })
+    if (alasan.length < 3) return res.status(400).json({ error: 'alasan penghapusan wajib diisi' })
+    const { rows } = await pool.query(`
+      SELECT s.data, s.surveyor_id, u.nama AS surveyor, s.created_at
+      FROM surveys s LEFT JOIN surveyors u ON u.id = s.surveyor_id WHERE s.id = $1`, [id])
+    if (!rows.length) return res.status(404).json({ error: 'survei tidak ada' })
+    const s = rows[0]
+    await pool.query(`
+      INSERT INTO survey_deletion_log (survey_id, nama, kelurahan, surveyor_id, surveyor, survey_created_at, alasan, admin_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [id, s.data?.pelanggan?.nama ?? null, s.data?.pelanggan?.kelurahan ?? null, s.surveyor_id, s.surveyor, s.created_at, alasan, req.user.id])
     await pool.query('DELETE FROM photo_access_log WHERE survey_id = $1', [id])
     await pool.query('DELETE FROM photos WHERE survey_id = $1', [id])
     await pool.query('DELETE FROM surveys WHERE id = $1', [id])
     await hapusDariStorage(id)
     res.json({ ok: true })
+  })
+
+  // Riwayat penghapusan untuk admin (200 terakhir)
+  app.get('/deletions', auth, hanyaAdmin, async (req, res) => {
+    const { rows } = await pool.query(`
+      SELECT l.id, l.survey_id, l.nama, l.kelurahan, l.surveyor, l.survey_created_at, l.alasan, l.deleted_at,
+             a.nama AS admin
+      FROM survey_deletion_log l LEFT JOIN surveyors a ON a.id = l.admin_id
+      ORDER BY l.deleted_at DESC LIMIT 200`)
+    res.json(rows)
   })
 
   // Langkah 8: foto hanya lewat URL bertanda tangan yang kedaluwarsa, bukan tautan publik

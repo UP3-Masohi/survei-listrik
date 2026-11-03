@@ -10,6 +10,6 @@ const { pool, tabel, disk, simpanKeStorage, bacaDariStorage, hapusDariStorage } 
 const corsOrigin = ['http://localhost:5173', 'http://localhost:4173', 'http://localhost:5174',
   ...(process.env.CORS_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean)]
 const app = buatApp({ pool, simpanKeStorage, bacaDariStorage, hapusDariStorage, corsOrigin })
-app.get('/_tiruan', (req, res) => res.json({ surveys: [...tabel.surveys.values()], photos: [...tabel.photos.values()], disk: [...disk.entries()].map(([k, v]) => [k, v.length]), log: tabel.log }))
+app.get('/_tiruan', (req, res) => res.json({ surveys: [...tabel.surveys.values()], photos: [...tabel.photos.values()], disk: [...disk.entries()].map(([k, v]) => [k, v.length]), log: tabel.log, hapusLog: tabel.hapusLog }))
 const PORT = Number(process.env.PORT || 3000)
 app.listen(PORT, () => console.log(`API tiruan (tanpa database) di port ${PORT}`))

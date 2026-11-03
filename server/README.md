@@ -32,7 +32,8 @@ npm start
 | PUT | `/surveys/:id` | upsert survei (idempoten), butuh Bearer token |
 | PUT | `/surveys/:id/photos/:type` | simpan foto `ktp` / `kk` / `rumah` (multipart `file`, maks 2 MB) |
 | GET | `/surveys?from=&to=` | daftar survei untuk admin (role `admin`) |
-| DELETE | `/surveys/:id` | admin menghapus survei salah input beserta foto dan log aksesnya |
+| DELETE | `/surveys/:id` | admin menghapus survei tidak valid; body `{ "alasan": "..." }` wajib; ringkasan dicatat di `survey_deletion_log` |
+| GET | `/deletions` | riwayat penghapusan (admin): nama, surveyor, alasan, admin, waktu |
 | GET | `/surveys/:id/photos/:type/url` | admin meminta URL foto bertanda tangan (berlaku 10 menit) |
 | GET | `/photos/:id/:type?exp=&oleh=&sig=` | mengunduh foto lewat URL bertanda tangan; setiap akses dicatat di `photo_access_log` |
 | GET | `/health` | cek hidup |

@@ -8,7 +8,8 @@ export async function buatPoolTiruan() {
                 { id: '22222222-2222-4222-8222-222222222222', nama: 'Admin', username: 'admin', password_hash: await bcrypt.hash('admin123', 4), role: 'admin' }],
     surveys: new Map(),
     photos: new Map(),
-    log: []
+    log: [],
+    hapusLog: []
   }
   const log = []
   const pool = {
@@ -23,6 +24,9 @@ export async function buatPoolTiruan() {
       }
       if (sql.includes('SELECT 1 FROM surveys WHERE id = $1 AND surveyor_id')) { const s = tabel.surveys.get(params[0]); return { rowCount: s && s.surveyor_id === params[1] ? 1 : 0, rows: [] } }
       if (sql.includes('SELECT 1 FROM surveys WHERE id = $1') && !sql.includes('surveyor_id')) return { rowCount: tabel.surveys.has(params[0]) ? 1 : 0, rows: [] }
+    if (sql.includes('SELECT s.data, s.surveyor_id')) { const s = tabel.surveys.get(params[0]); return { rows: s ? [{ data: s.data, surveyor_id: s.surveyor_id, surveyor: tabel.surveyors.find(u => u.id === s.surveyor_id)?.nama, created_at: s.created_at }] : [] } }
+    if (sql.includes('INSERT INTO survey_deletion_log')) { const [survey_id, nama, kelurahan, surveyor_id, surveyor, survey_created_at, alasan, admin_id] = params; tabel.hapusLog.unshift({ id: tabel.hapusLog.length + 1, survey_id, nama, kelurahan, surveyor_id, surveyor, survey_created_at, alasan, admin_id, deleted_at: new Date().toISOString(), admin: tabel.surveyors.find(u => u.id === admin_id)?.nama }); return { rowCount: 1, rows: [] } }
+    if (sql.includes('FROM survey_deletion_log')) return { rows: tabel.hapusLog.slice(0, 200) }
     if (sql.includes('DELETE FROM photo_access_log')) { tabel.log = tabel.log.filter(l => l.survey_id !== params[0]); return { rowCount: 1, rows: [] } }
     if (sql.includes('DELETE FROM photos')) { for (const k of [...tabel.photos.keys()]) if (k.startsWith(params[0] + '-')) tabel.photos.delete(k); return { rowCount: 1, rows: [] } }
     if (sql.includes('DELETE FROM surveys')) { tabel.surveys.delete(params[0]); return { rowCount: 1, rows: [] } }
