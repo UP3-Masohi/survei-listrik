@@ -1,0 +1,31 @@
+# Deploy otomatis ke VPS setiap push ke main: masuk lewat SSH lalu menjalankan deploy/deploy.sh.
+# Secret repo: VPS_SSH_KEY (kunci privat deploy), VPS_HOST (IP/host), VPS_USER (root).
+name: Deploy ke VPS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Siapkan kunci SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy
+          chmod 600 ~/.ssh/deploy
+          ssh-keyscan -H "${{ secrets.VPS_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+      - name: Jalankan deploy.sh di VPS
+        run: |
+          ssh -i ~/.ssh/deploy -o ServerAliveInterval=30 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            'cd /opt/survei-listrik && bash deploy/deploy.sh'
+      - name: Cek kesehatan API lewat Nginx di VPS
+        run: |
+          ssh -i ~/.ssh/deploy "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
+            'curl -fsS http://127.0.0.1/api/health && echo " <- Nginx -> API OK"'

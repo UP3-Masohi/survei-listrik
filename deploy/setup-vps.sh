@@ -13,6 +13,11 @@ WEB_DIR="${WEB_DIR:-/var/www/survei-listrik}"
 if [ -z "$DOMAIN" ]; then echo "Pakai: bash deploy/setup-vps.sh <domain>"; exit 1; fi
 if [ "$(id -u)" -ne 0 ]; then echo "Jalankan sebagai root (sudo)."; exit 1; fi
 
+echo "== Menunggu proses apt lain (unattended-upgrades) selesai"
+for i in $(seq 1 90); do
+  if fuser /var/lib/apt/lists/lock /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then sleep 10; else break; fi
+done
+
 echo "== Paket dasar"
 apt-get update -y
 apt-get install -y ca-certificates curl git nginx certbot python3-certbot-nginx ufw
