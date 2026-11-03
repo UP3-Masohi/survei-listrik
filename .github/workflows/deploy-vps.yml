@@ -25,7 +25,11 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy -o ServerAliveInterval=30 "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
             'cd /opt/survei-listrik && bash deploy/deploy.sh'
-      - name: Cek kesehatan API lewat Nginx di VPS
+      - name: Cek kesehatan API (langsung dan lewat Nginx/HTTPS)
         run: |
-          ssh -i ~/.ssh/deploy "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" \
-            'curl -fsS http://127.0.0.1/api/health && echo " <- Nginx -> API OK"'
+          ssh -i ~/.ssh/deploy "${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }}" '
+            set -e
+            curl -fsS http://127.0.0.1:3000/health && echo " <- API OK"
+            NAMA=$(grep -m1 -E "^\s*server_name" /etc/nginx/sites-enabled/survei-listrik | awk "{print \$2}" | tr -d ";")
+            curl -fsSL --resolve "$NAMA:443:127.0.0.1" --resolve "$NAMA:80:127.0.0.1" "http://$NAMA/api/health" && echo " <- Nginx ($NAMA) -> API OK"
+          '
