@@ -62,6 +62,15 @@ Workflow `.github/workflows/pages.yml` membangun dan menayangkan `dist/` ke
 
 Catatan: GitHub Pages pada repo privat memerlukan paket GitHub berbayar; pada paket gratis, repo harus publik.
 
+## Alamat produksi saat ini
+
+- Aplikasi + API (VPS): https://116-212-75-98.sslip.io (HTTPS Let's Encrypt, diperpanjang otomatis oleh certbot).
+  Nama `sslip.io` memetakan langsung ke IP VPS; bila nanti ada domain sendiri, jalankan di VPS:
+  `bash /opt/survei-listrik/deploy/setup-vps.sh domain-baru.id`, lalu ubah variabel repo `VITE_API_URL` dan
+  `CORS_ORIGIN` di `server/.env`.
+- Salinan aplikasi di GitHub Pages: https://up3-masohi.github.io/survei-listrik/ (memakai API VPS di atas).
+- Deploy otomatis: setiap push ke `main` menjalankan workflow `deploy-vps.yml` (SSH ke VPS, `deploy/deploy.sh`).
+
 ## Deploy produksi di VPS (satu domain, HTTPS)
 
 Berkas di folder `deploy/`:
