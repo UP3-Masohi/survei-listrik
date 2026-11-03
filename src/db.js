@@ -70,3 +70,12 @@ export async function daftarFoto(surveyId) {
     return { ...f, blob: new Blob([bytes], { type: 'image/jpeg' }) }
   }))
 }
+
+// Hapus survei beserta foto dan antriannya dari HP (untuk data salah input)
+export function hapusSurvei(id) {
+  return db.transaction('rw', db.surveys, db.photos, db.outbox, async () => {
+    await db.photos.where('surveyId').equals(id).delete()
+    await db.outbox.where('surveyId').equals(id).delete()
+    await db.surveys.delete(id)
+  })
+}

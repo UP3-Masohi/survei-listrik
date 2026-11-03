@@ -27,7 +27,8 @@ export const IKON = {
   unduh: svg('<path d="M12 3v12M6 11l6 6 6-6M4 21h16"/>'),
   segarkan: svg('<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>'),
   jam: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
-  simpan: svg('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>')
+  simpan: svg('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/>'),
+  hapus: svg('<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/>')
 }
 export const ikon = (nama) => IKON[nama] ?? ''
 

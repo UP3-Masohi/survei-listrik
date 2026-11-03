@@ -1,5 +1,5 @@
 import L from 'leaflet'
-import { ambilDaftarSurvei, ambilUrlFoto } from './api.js'
+import { ambilDaftarSurvei, ambilUrlFoto, hapusSurveiServer } from './api.js'
 import { ikon, tampilkanNotifikasi } from './main.js'
 import { formatTanggal } from './form.js'
 import { tingkatAkurasi } from './geo.js'
@@ -227,7 +227,10 @@ export async function tampilkanDasbor(el) {
     wadah.innerHTML = `
       <div class="form-atas">
         <h2>${esc(d.pelanggan?.nama || 'Tanpa nama')}</h2>
-        <button type="button" class="tautan" id="btn-tutup-detail">Tutup</button>
+        <div style="display:flex;gap:14px">
+          <button type="button" class="tautan bahaya" id="btn-hapus-server">${ikon('hapus')}Hapus</button>
+          <button type="button" class="tautan" id="btn-tutup-detail">Tutup</button>
+        </div>
       </div>
       <dl class="detail-baris">
         ${baris('NIK', d.pelanggan?.nik)}
@@ -249,6 +252,19 @@ export async function tampilkanDasbor(el) {
         ${(s.photos ?? []).map(p => `<figure><img alt="Foto ${esc(p.type)}" data-tipe="${esc(p.type)}"><figcaption>${esc(p.type.toUpperCase())} · ${Math.round((p.size ?? 0) / 1024)} KB</figcaption></figure>`).join('')}
       </div>`
     wadah.querySelector('#btn-tutup-detail').addEventListener('click', () => { wadah.hidden = true })
+    wadah.querySelector('#btn-hapus-server').addEventListener('click', async () => {
+      const nama = d.pelanggan?.nama || 'tanpa nama'
+      if (!confirm(`Hapus survei "${nama}" dari server beserta fotonya? Tindakan ini tidak bisa dibatalkan.`)) return
+      try {
+        await hapusSurveiServer(s.id)
+        semua = semua.filter(x => x.id !== s.id)
+        wadah.hidden = true
+        terapkan()
+        tampilkanNotifikasi(`Survei "${nama}" dihapus dari server`)
+      } catch (e) {
+        tampilkanNotifikasi(`Gagal menghapus (${e.message})`)
+      }
+    })
     wadah.scrollIntoView({ behavior: 'smooth', block: 'start' })
     for (const img of wadah.querySelectorAll('img[data-tipe]')) {
       try { img.src = await ambilUrlFoto(s.id, img.dataset.tipe) } catch { img.alt = 'Foto tidak bisa dimuat' }

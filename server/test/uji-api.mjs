@@ -4,9 +4,9 @@ import { buatPoolTiruan } from './pool-tiruan.mjs'
 
 import { buatApp } from '../src/app.js'
 
-const { pool, tabel, disk, simpanKeStorage, bacaDariStorage, surveyorId } = await buatPoolTiruan()
+const { pool, tabel, disk, simpanKeStorage, bacaDariStorage, hapusDariStorage, surveyorId } = await buatPoolTiruan()
 
-const app = buatApp({ pool, simpanKeStorage, bacaDariStorage, corsOrigin: ['http://localhost:5173'] })
+const app = buatApp({ pool, simpanKeStorage, bacaDariStorage, hapusDariStorage, corsOrigin: ['http://localhost:5173'] })
 const server = app.listen(0)
 const BASE = `http://127.0.0.1:${server.address().port}`
 const hasil = []
@@ -102,7 +102,15 @@ cek('URL foto survei tidak ada -> 404', r.status === 404)
 r = await fetch(`${BASE}/photos/${id}/ktp`)
 cek('foto tanpa parameter -> 400', r.status === 400)
 
-// 9. JSON rusak -> 400
+// 9. DELETE /surveys/:id (admin)
+r = await fetch(`${BASE}/surveys/${id}`, { method: 'DELETE', headers: auth() })
+cek('DELETE survei oleh surveyor -> 403', r.status === 403)
+r = await fetch(`${BASE}/surveys/${id}`, { method: 'DELETE', headers: auth(tokenAdmin) })
+cek('DELETE survei oleh admin -> 200, baris, foto, log, dan file hilang', r.status === 200 && tabel.surveys.size === 0 && tabel.photos.size === 0 && tabel.log.length === 0 && disk.size === 0)
+r = await fetch(`${BASE}/surveys/${id}`, { method: 'DELETE', headers: auth(tokenAdmin) })
+cek('DELETE survei kedua kali -> 404', r.status === 404)
+
+// 10. JSON rusak -> 400
 r = await fetch(`${BASE}/surveys/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...auth() }, body: '{rusak' })
 cek('JSON rusak -> 400', r.status === 400)
 

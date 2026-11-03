@@ -1,5 +1,5 @@
 import { v4 as uuid } from 'uuid'
-import { db, simpanSurvei, bacaSurvei } from './db.js'
+import { db, simpanSurvei, bacaSurvei, hapusSurvei } from './db.js'
 import { tampilkanLayar, tampilkanNotifikasi, ikon } from './main.js'
 import { tampilkanJumlahPending, kirimUlang, ambilGalatTerakhir, jalankanSync } from './sync.js'
 import { JENIS_FOTO, muatPratinjau, pasangInputFoto } from './camera.js'
@@ -199,6 +199,7 @@ function templateForm(s, hanyaBaca) {
       </fieldset>
 
       <p class="autosave" id="status-autosave"></p>
+      <p class="hapus-baris"><button type="button" class="tautan bahaya" id="btn-hapus">${ikon('hapus')}Hapus survei ini</button></p>
       <div class="aksi" ${hanyaBaca ? 'hidden' : ''}>
         <button type="submit" class="tombol" id="btn-kirim">${ikon('kirim')}<span>${s.status === 'failed' ? 'Kirim ulang' : 'Simpan dan kirim'}</span></button>
         <button type="button" class="tombol sekunder" id="btn-draf">${ikon('simpan')}<span>Draf</span></button>
@@ -360,10 +361,17 @@ export async function tampilkanForm(el, { id, surveyorId }) {
         <p id="ringkasan-kelurahan"></p>
         <p>Terkirim ${formatTanggal(s.sentAt)}. Data pelanggan, lokasi, dan foto sudah dihapus dari HP ini
            sesuai aturan privasi; data lengkap tersimpan di server.</p>
+        <p style="margin-top:12px"><button type="button" class="tautan bahaya" id="btn-hapus">Hapus ringkasan ini dari HP</button></p>
       </section>`
     el.querySelector('#ringkasan-nama').textContent = s.ringkasan?.nama || 'Tanpa nama'
     el.querySelector('#ringkasan-kelurahan').textContent = s.ringkasan?.kelurahan ? `Kelurahan/Desa ${s.ringkasan.kelurahan}` : ''
     el.querySelector('#btn-kembali').addEventListener('click', () => tampilkanLayar('beranda'))
+    el.querySelector('#btn-hapus').addEventListener('click', async () => {
+      if (!confirm('Hapus ringkasan survei ini dari HP? Data di server tidak ikut terhapus.')) return
+      await hapusSurvei(s.id)
+      tampilkanNotifikasi('Ringkasan dihapus dari HP')
+      tampilkanLayar('beranda')
+    })
     return
   }
   const hanyaBaca = s.status === 'sent' || s.status === 'pending'   // status hanya bergerak maju
@@ -490,6 +498,20 @@ export async function tampilkanForm(el, { id, surveyorId }) {
     tampilkanLayar('beranda')
   }
   el.querySelector('#btn-kembali').addEventListener('click', keluar)
+
+  // Hapus survei yang salah input: draf, menunggu kirim (dikeluarkan dari antrian), atau gagal
+  el.querySelector('#btn-hapus').addEventListener('click', async () => {
+    const nama = s.pelanggan?.nama?.trim() || 'tanpa nama'
+    const pesan = s.status === 'pending'
+      ? `Survei "${nama}" masih menunggu kirim. Hapus dari HP dan batalkan pengirimannya?`
+      : `Hapus survei "${nama}" beserta fotonya dari HP? Tindakan ini tidak bisa dibatalkan.`
+    if (!confirm(pesan)) return
+    clearTimeout(timer)   // batalkan autosave yang masih tertunda agar record tidak ditulis ulang
+    await hapusSurvei(s.id)
+    await tampilkanJumlahPending()
+    tampilkanNotifikasi('Survei dihapus')
+    keluar()
+  })
 
   el.querySelector('#btn-draf')?.addEventListener('click', async () => {
     clearTimeout(timer)

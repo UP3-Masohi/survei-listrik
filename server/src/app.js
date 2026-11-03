@@ -12,7 +12,7 @@ const TIPE_FOTO = new Set(['ktp', 'kk', 'rumah'])
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 // pool dan simpanKeStorage disuntikkan agar aplikasi bisa diuji tanpa database sungguhan
-export function buatApp({ pool, simpanKeStorage, bacaDariStorage, corsOrigin }) {
+export function buatApp({ pool, simpanKeStorage, bacaDariStorage, hapusDariStorage, corsOrigin }) {
   const app = express()
   app.disable('x-powered-by')
   app.use(cors({ origin: corsOrigin }))     // hanya domain PWA
@@ -72,6 +72,19 @@ export function buatApp({ pool, simpanKeStorage, bacaDariStorage, corsOrigin }) 
       ORDER BY s.created_at DESC
       LIMIT 1000`, [from || null, to || null])
     res.json(rows)
+  })
+
+  // Hapus survei yang salah input (admin): baris survei, foto, log akses, dan file fotonya
+  app.delete('/surveys/:id', auth, hanyaAdmin, async (req, res) => {
+    const { id } = req.params
+    if (!UUID.test(id)) return res.status(400).json({ error: 'id bukan UUID' })
+    const { rowCount } = await pool.query('SELECT 1 FROM surveys WHERE id = $1', [id])
+    if (!rowCount) return res.status(404).json({ error: 'survei tidak ada' })
+    await pool.query('DELETE FROM photo_access_log WHERE survey_id = $1', [id])
+    await pool.query('DELETE FROM photos WHERE survey_id = $1', [id])
+    await pool.query('DELETE FROM surveys WHERE id = $1', [id])
+    await hapusDariStorage(id)
+    res.json({ ok: true })
   })
 
   // Langkah 8: foto hanya lewat URL bertanda tangan yang kedaluwarsa, bukan tautan publik

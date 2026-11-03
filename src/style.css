@@ -184,6 +184,10 @@ main.lebar { max-width: 1240px; }
   font-weight: 600;
 }
 .tautan svg { width: 18px; height: 18px; }
+.tautan.bahaya { color: var(--merah); }
+.tombol.bahaya { background: var(--merah); box-shadow: 0 4px 14px rgba(198, 40, 40, 0.3); }
+.tombol.bahaya:active { background: #a31f1f; }
+.hapus-baris { margin: 8px 0 0; text-align: center; }
 
 /* Tombol apung */
 .fab {

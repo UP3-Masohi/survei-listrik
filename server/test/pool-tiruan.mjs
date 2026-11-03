@@ -21,8 +21,12 @@ export async function buatPoolTiruan() {
         tabel.surveys.set(id, { id, surveyor_id: lama?.surveyor_id ?? surveyor_id, data, lat, lng, accuracy_m, created_at, received_at: lama?.received_at ?? new Date().toISOString() })
         return { rowCount: 1, rows: [] }
       }
-      if (sql.includes('SELECT 1 FROM surveys')) { const s = tabel.surveys.get(params[0]); return { rowCount: s && s.surveyor_id === params[1] ? 1 : 0, rows: [] } }
-      if (sql.includes('SELECT 1 FROM photos')) return { rowCount: tabel.photos.has(`${params[0]}-${params[1]}`) ? 1 : 0, rows: [] }
+      if (sql.includes('SELECT 1 FROM surveys WHERE id = $1 AND surveyor_id')) { const s = tabel.surveys.get(params[0]); return { rowCount: s && s.surveyor_id === params[1] ? 1 : 0, rows: [] } }
+      if (sql.includes('SELECT 1 FROM surveys WHERE id = $1') && !sql.includes('surveyor_id')) return { rowCount: tabel.surveys.has(params[0]) ? 1 : 0, rows: [] }
+    if (sql.includes('DELETE FROM photo_access_log')) { tabel.log = tabel.log.filter(l => l.survey_id !== params[0]); return { rowCount: 1, rows: [] } }
+    if (sql.includes('DELETE FROM photos')) { for (const k of [...tabel.photos.keys()]) if (k.startsWith(params[0] + '-')) tabel.photos.delete(k); return { rowCount: 1, rows: [] } }
+    if (sql.includes('DELETE FROM surveys')) { tabel.surveys.delete(params[0]); return { rowCount: 1, rows: [] } }
+    if (sql.includes('SELECT 1 FROM photos')) return { rowCount: tabel.photos.has(`${params[0]}-${params[1]}`) ? 1 : 0, rows: [] }
     if (sql.includes('SELECT path FROM photos')) { const p = tabel.photos.get(`${params[0]}-${params[1]}`); return { rows: p ? [{ path: p.path }] : [] } }
     if (sql.includes('INSERT INTO photo_access_log')) { tabel.log.push({ survey_id: params[0], type: params[1], admin_id: params[2], at: new Date().toISOString() }); return { rowCount: 1, rows: [] } }
     if (sql.includes('INSERT INTO photos')) { const [survey_id, type, path, size] = params; tabel.photos.set(`${survey_id}-${type}`, { survey_id, type, path, size }); return { rowCount: 1, rows: [] } }
@@ -37,6 +41,7 @@ export async function buatPoolTiruan() {
   const disk = new Map()
   const simpanKeStorage = async (path, buf) => { disk.set(path, buf) }
   const bacaDariStorage = async (path) => { const b = disk.get(path); if (!b) throw new Error('tidak ada'); return b }
+  const hapusDariStorage = async (folder) => { for (const k of [...disk.keys()]) if (k.startsWith(folder + '/')) disk.delete(k) }
 
-  return { pool, tabel, disk, simpanKeStorage, bacaDariStorage, surveyorId }
+  return { pool, tabel, disk, simpanKeStorage, bacaDariStorage, hapusDariStorage, surveyorId }
 }

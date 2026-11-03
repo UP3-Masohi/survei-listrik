@@ -13,3 +13,8 @@ export async function simpanKeStorage(path, buffer) {
 export async function bacaDariStorage(path) {
   return fs.readFile(join(FOTO_DIR, path))
 }
+
+// Hapus semua foto satu survei (folder FOTO_DIR/<survey_id>/)
+export async function hapusDariStorage(folder) {
+  await fs.rm(join(FOTO_DIR, folder), { recursive: true, force: true })
+}

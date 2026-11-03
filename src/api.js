@@ -36,3 +36,8 @@ export async function ambilUrlFoto(surveyId, tipe) {
   const { url } = await r.json()
   return `${BASE}${url}`
 }
+
+export async function hapusSurveiServer(surveyId) {
+  const r = await fetch(`${BASE}/surveys/${surveyId}`, { method: 'DELETE', headers: auth() })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+}
