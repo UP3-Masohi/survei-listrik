@@ -1,6 +1,8 @@
 import { v4 as uuid } from 'uuid'
 import { db, simpanSurvei } from './db.js'
 import { tampilkanLayar, tampilkanNotifikasi, perbaruiBadge } from './main.js'
+import { JENIS_FOTO, muatPratinjau, pasangInputFoto } from './camera.js'
+import { ambilLokasi, tampilkanPeta, pesanGalatLokasi } from './geo.js'
 
 // ===================== Inti (sesuai panduan) =====================
 
@@ -149,13 +151,24 @@ function templateForm(s, hanyaBaca) {
       <fieldset class="kartu">
         <legend>Bukti</legend>
         <div class="field">
-          <span>Foto KTP, KK, dan rumah</span>
-          <p class="info" id="info-foto">Pengambilan foto ditambahkan pada Langkah 4.</p>
+          <span>Foto KTP, KK, dan tampak depan rumah</span>
+          <div class="foto-grid">
+            ${JENIS_FOTO.map(([tipe, label]) => `
+            <div class="foto-blok">
+              <img id="pratinjau-${tipe}" alt="" hidden>
+              <label class="tombol sekunder foto-tombol">${label}
+                <input type="file" accept="image/*" capture="environment" data-tipe="${tipe}" hidden>
+              </label>
+              <small class="foto-ket" data-ket-foto="${tipe}">Belum ada foto</small>
+            </div>`).join('')}
+          </div>
           <small class="galat" data-galat="foto"></small>
         </div>
         <div class="field">
           <span>Lokasi rumah</span>
-          <p class="info" id="info-lokasi">Penandaan lokasi GPS ditambahkan pada Langkah 5.</p>
+          <button type="button" class="tombol sekunder" id="btn-gps">Ambil lokasi GPS</button>
+          <p class="info" id="status-gps">Belum ada titik lokasi.</p>
+          <div id="peta" class="peta" hidden></div>
           <small class="galat" data-galat="lokasi"></small>
         </div>
       </fieldset>
@@ -316,7 +329,7 @@ export async function tampilkanForm(el, { id, surveyorId }) {
   const form = el.querySelector('#form-survei')
   const statusAutosave = el.querySelector('#status-autosave')
   isiFormDariRecord(form, s)
-  if (hanyaBaca) form.querySelectorAll('input, select, textarea, #btn-hapus-ttd').forEach(x => { x.disabled = true })
+  if (hanyaBaca) form.querySelectorAll('input, select, textarea, #btn-hapus-ttd, #btn-gps').forEach(x => { x.disabled = true })
 
   // Indikator tampilan: autosave() menyimpan 500 ms setelah ketikan terakhir,
   // jadi 700 ms setelah itu draf dipastikan sudah ada di IndexedDB.
@@ -343,8 +356,62 @@ export async function tampilkanForm(el, { id, surveyorId }) {
   const ttd = pasangTandaTangan(el.querySelector('#ttd'), s, { hanyaBaca, onUbah: tandaiPerubahan })
   el.querySelector('#btn-hapus-ttd').addEventListener('click', () => ttd?.hapus())
 
+  // ---- Foto (Langkah 4) ----
+  await muatPratinjau(form, s.id)
+  if (!hanyaBaca) {
+    pasangInputFoto(form, s, () => {
+      form.querySelector('.galat[data-galat="foto"]').textContent = ''
+    })
+  }
+
+  // ---- Lokasi GPS dan peta (Langkah 5) ----
+  const btnGps = form.querySelector('#btn-gps')
+  const statusGps = form.querySelector('#status-gps')
+  const elPeta = form.querySelector('#peta')
+  let peta = null
+
+  const tulisStatusLokasi = () => {
+    const l = s.lokasi
+    statusGps.textContent = `Lat ${l.lat.toFixed(6)}, Lng ${l.lng.toFixed(6)} · akurasi ${l.accuracyM} m` +
+      (l.manual ? ' · marker digeser manual' : '')
+  }
+  const gambarPeta = () => {
+    if (!s.lokasi) return
+    tulisStatusLokasi()
+    elPeta.hidden = false
+    if (peta) { peta.remove(); peta = null }
+    peta = tampilkanPeta('peta', s.lokasi, lokasiBaru => {
+      if (hanyaBaca) return
+      s.lokasi = lokasiBaru
+      tulisStatusLokasi()
+      tandaiPerubahan()
+    })
+    setTimeout(() => peta.invalidateSize(), 0)
+  }
+  gambarPeta()
+
+  btnGps.addEventListener('click', async () => {
+    btnGps.disabled = true
+    btnGps.textContent = 'Mencari sinyal GPS…'
+    statusGps.textContent = 'Mencari sinyal GPS, biasanya 5–20 detik. Tetap di tempat terbuka.'
+    try {
+      s.lokasi = await ambilLokasi()
+      form.querySelector('.galat[data-galat="lokasi"]').textContent = ''
+      gambarPeta()
+      tandaiPerubahan()
+      btnGps.textContent = 'Ambil ulang lokasi'
+    } catch (e) {
+      statusGps.textContent = `${pesanGalatLokasi(e).replace(/\.?$/, '.')} Tekan "Coba lagi".`
+      btnGps.textContent = 'Coba lagi'
+    } finally {
+      btnGps.disabled = false
+    }
+  })
+  if (s.lokasi) btnGps.textContent = 'Ambil ulang lokasi'
+
   const keluar = () => {
     clearTimeout(timerIndikator)
+    if (peta) { peta.remove(); peta = null }
     tampilkanLayar('beranda')
   }
   el.querySelector('#btn-kembali').addEventListener('click', keluar)
