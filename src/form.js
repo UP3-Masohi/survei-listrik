@@ -3,7 +3,7 @@ import { db, simpanSurvei, bacaSurvei } from './db.js'
 import { tampilkanLayar, tampilkanNotifikasi, ikon } from './main.js'
 import { tampilkanJumlahPending, kirimUlang, ambilGalatTerakhir, jalankanSync } from './sync.js'
 import { JENIS_FOTO, muatPratinjau, pasangInputFoto } from './camera.js'
-import { ambilLokasi, tampilkanPeta, pesanGalatLokasi } from './geo.js'
+import { ambilLokasi, tampilkanPeta, pesanGalatLokasi, tingkatAkurasi, MAKS_AKURASI_TANPA_GESER_M } from './geo.js'
 
 // ===================== Inti (sesuai panduan) =====================
 
@@ -436,8 +436,13 @@ export async function tampilkanForm(el, { id, surveyorId }) {
 
   const tulisStatusLokasi = () => {
     const l = s.lokasi
-    statusGps.textContent = `Lat ${l.lat.toFixed(6)}, Lng ${l.lng.toFixed(6)} · akurasi ${l.accuracyM} m` +
-      (l.manual ? ' · marker digeser manual' : '')
+    const tingkat = tingkatAkurasi(l.accuracyM)
+    const perluGeser = l.accuracyM > MAKS_AKURASI_TANPA_GESER_M && !l.manual
+    statusGps.className = `info ${tingkat.kode}`
+    statusGps.textContent = `${tingkat.label}, ${l.accuracyM} m. ` +
+      (l.manual ? 'Marker sudah digeser ke posisi rumah. ' : (perluGeser ? tingkat.pesan + ' ' : tingkat.pesan + ' ')) +
+      `(${l.lat.toFixed(5)}, ${l.lng.toFixed(5)})`
+    if (!perluGeser) form.querySelector('.galat[data-galat="lokasi"]').textContent = ''
   }
   const gambarPeta = () => {
     if (!s.lokasi) return
@@ -457,14 +462,20 @@ export async function tampilkanForm(el, { id, surveyorId }) {
   btnGps.addEventListener('click', async () => {
     btnGps.disabled = true
     btnGps.querySelector('span').textContent = 'Mencari sinyal GPS…'
-    statusGps.textContent = 'Mencari sinyal GPS, biasanya 5–20 detik. Tetap di tempat terbuka.'
+    statusGps.className = 'info'
+    statusGps.textContent = 'Mencari sinyal GPS, sampai 30 detik. Tetap di tempat terbuka.'
     try {
-      s.lokasi = await ambilLokasi()
+      s.lokasi = await ambilLokasi(undefined, {
+        onUpdate: (sekarang, terbaik) => {
+          statusGps.textContent = `Mencari sinyal GPS… akurasi ${sekarang} m (terbaik ${terbaik} m). Menunggu sampai ≤ 20 m atau 30 detik.`
+        }
+      })
       form.querySelector('.galat[data-galat="lokasi"]').textContent = ''
       gambarPeta()
       tandaiPerubahan()
       btnGps.querySelector('span').textContent = 'Ambil ulang lokasi'
     } catch (e) {
+      statusGps.className = 'info buruk'
       statusGps.textContent = `${pesanGalatLokasi(e).replace(/\.?$/, '.')} Tekan "Coba lagi".`
       btnGps.querySelector('span').textContent = 'Coba lagi'
     } finally {
@@ -497,6 +508,10 @@ export async function tampilkanForm(el, { id, surveyorId }) {
       const inputJarak = form.querySelector('[name="teknis.jarakTiangM"]')
       if (inputJarak.validity.rangeUnderflow || inputJarak.validity.badInput) {
         tampilkanGalat(form, { jarak: 'Jarak harus angka 0 atau lebih' })
+        return
+      }
+      if (s.lokasi?.lat && s.lokasi.accuracyM > MAKS_AKURASI_TANPA_GESER_M && !s.lokasi.manual) {
+        tampilkanGalat(form, { lokasi: `Akurasi GPS ${s.lokasi.accuracyM} m. Geser marker ke posisi rumah dulu, atau ambil ulang di tempat terbuka.` })
         return
       }
       const err = await kirim(s)

@@ -2,6 +2,7 @@ import L from 'leaflet'
 import { ambilDaftarSurvei, ambilUrlFoto } from './api.js'
 import { ikon, tampilkanNotifikasi } from './main.js'
 import { formatTanggal } from './form.js'
+import { tingkatAkurasi } from './geo.js'
 
 // Dasbor admin: ringkasan, peta sebaran, tabel, detail survei beserta foto, ekspor CSV.
 // Data diambil dari GET /surveys (butuh role admin) dan tidak disimpan di HP.
@@ -41,6 +42,12 @@ export async function tampilkanDasbor(el) {
       <label>Cari<input type="search" id="f-cari" placeholder="Nama, kelurahan, surveyor"></label>
       <div class="aksi-filter">
         <label style="flex:1">Daya<select id="f-daya"><option value="">Semua</option></select></label>
+        <label style="flex:1">Akurasi GPS<select id="f-akurasi">
+          <option value="">Semua</option>
+          <option value="baik">Baik (≤ 20 m)</option>
+          <option value="sedang">Sedang (21–50 m)</option>
+          <option value="rendah">Perlu verifikasi (> 50 m)</option>
+        </select></label>
         <button type="button" class="tombol kecil" id="btn-terapkan" style="align-self:end">Terapkan</button>
       </div>
     </section>
@@ -114,9 +121,14 @@ export async function tampilkanDasbor(el) {
   const terapkan = () => {
     const kata = q('#f-cari').value.trim().toLowerCase()
     const daya = q('#f-daya').value
+    const akurasi = q('#f-akurasi').value
     tersaring = semua.filter(s => {
       const d = s.data ?? {}
       if (daya && String(d.permohonan?.dayaVA) !== daya) return false
+      if (akurasi) {
+        const kode = s.accuracy_m == null ? 'rendah' : tingkatAkurasi(s.accuracy_m).kode
+        if (akurasi === 'rendah' ? !(kode === 'rendah' || kode === 'buruk') : kode !== akurasi) return false
+      }
       if (!kata) return true
       return [d.pelanggan?.nama, d.pelanggan?.kelurahan, d.pelanggan?.kecamatan, d.pelanggan?.alamat, s.surveyor]
         .filter(Boolean).join(' ').toLowerCase().includes(kata)
@@ -134,11 +146,12 @@ export async function tampilkanDasbor(el) {
     const akurasi = tersaring.map(s => s.accuracy_m).filter(a => a != null)
     const rataAkurasi = akurasi.length ? Math.round(akurasi.reduce((a, b) => a + b, 0) / akurasi.length) : null
     const lengkap = tersaring.filter(s => (s.photos?.length ?? 0) >= 3).length
+    const perluVerifikasi = tersaring.filter(s => s.accuracy_m == null || s.accuracy_m > 50).length
     q('#dasbor-tiles').innerHTML = `
       <div class="tile biru"><div class="tile-angka">${tersaring.length}</div><div class="tile-label">Total survei</div></div>
       <div class="tile"><div class="tile-angka">${hariIni}</div><div class="tile-label">Hari ini · ${mingguIni} dalam 7 hari</div></div>
       <div class="tile hijau"><div class="tile-angka">${lengkap}</div><div class="tile-label">Foto lengkap (3 foto)</div></div>
-      <div class="tile kuning"><div class="tile-angka">${rataAkurasi ?? '–'}<small style="font-size:0.9rem"> m</small></div><div class="tile-label">Rata-rata akurasi GPS</div></div>`
+      <div class="tile kuning"><div class="tile-angka">${rataAkurasi ?? '–'}<small style="font-size:0.9rem"> m</small></div><div class="tile-label">Rata-rata akurasi GPS · ${perluVerifikasi} perlu verifikasi (> 50 m)</div></div>`
   }
 
   // ---------- Peta ----------
@@ -194,7 +207,7 @@ export async function tampilkanDasbor(el) {
         <td>${esc(s.surveyor || '–')}</td>
         <td>${esc(formatTanggal(s.created_at))}</td>
         <td>${esc(formatTanggal(s.received_at))}</td>
-        <td>${s.accuracy_m != null ? esc(s.accuracy_m) + ' m' : '–'}</td>
+        <td class="${s.accuracy_m != null ? 'akurasi-' + (['rendah', 'buruk'].includes(tingkatAkurasi(s.accuracy_m).kode) ? 'rendah' : tingkatAkurasi(s.accuracy_m).kode) : ''}">${s.accuracy_m != null ? esc(s.accuracy_m) + ' m' : '–'}</td>
         <td>${(s.photos?.length ?? 0)}/3</td>
       </tr>`
     }).join('') || '<tr><td colspan="9" style="color:var(--teks-muda)">Tidak ada survei pada rentang ini.</td></tr>'
@@ -270,6 +283,7 @@ export async function tampilkanDasbor(el) {
   q('#btn-csv').addEventListener('click', unduhCsv)
   q('#f-cari').addEventListener('input', terapkan)
   q('#f-daya').addEventListener('change', terapkan)
+  q('#f-akurasi').addEventListener('change', terapkan)
 
   await muat()
 }

@@ -402,6 +402,12 @@ legend {
 }
 .galat-ringkasan { background: var(--merah-50); color: var(--merah); font-weight: 600; }
 .info { background: var(--biru-50); color: var(--biru-700); }
+.info.baik { background: var(--hijau-50); color: var(--hijau); }
+.info.sedang { background: var(--kuning-50); color: #b45309; }
+.info.rendah, .info.buruk { background: var(--merah-50); color: var(--merah); }
+.akurasi-baik { color: var(--hijau); font-weight: 600; }
+.akurasi-sedang { color: #b45309; font-weight: 600; }
+.akurasi-rendah { color: var(--merah); font-weight: 600; }
 .galat-info { background: var(--merah-50); color: var(--merah); }
 
 /* Foto */
