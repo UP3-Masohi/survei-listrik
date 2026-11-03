@@ -7,7 +7,8 @@ export async function buatPoolTiruan() {
     surveyors: [{ id: surveyorId, nama: 'Surveyor Uji', username: 'surveyor1', password_hash: await bcrypt.hash('rahasia123', 4), role: 'surveyor' },
                 { id: '22222222-2222-4222-8222-222222222222', nama: 'Admin', username: 'admin', password_hash: await bcrypt.hash('admin123', 4), role: 'admin' }],
     surveys: new Map(),
-    photos: new Map()
+    photos: new Map(),
+    log: []
   }
   const log = []
   const pool = {
@@ -21,7 +22,10 @@ export async function buatPoolTiruan() {
         return { rowCount: 1, rows: [] }
       }
       if (sql.includes('SELECT 1 FROM surveys')) { const s = tabel.surveys.get(params[0]); return { rowCount: s && s.surveyor_id === params[1] ? 1 : 0, rows: [] } }
-      if (sql.includes('INSERT INTO photos')) { const [survey_id, type, path, size] = params; tabel.photos.set(`${survey_id}-${type}`, { survey_id, type, path, size }); return { rowCount: 1, rows: [] } }
+      if (sql.includes('SELECT 1 FROM photos')) return { rowCount: tabel.photos.has(`${params[0]}-${params[1]}`) ? 1 : 0, rows: [] }
+    if (sql.includes('SELECT path FROM photos')) { const p = tabel.photos.get(`${params[0]}-${params[1]}`); return { rows: p ? [{ path: p.path }] : [] } }
+    if (sql.includes('INSERT INTO photo_access_log')) { tabel.log.push({ survey_id: params[0], type: params[1], admin_id: params[2], at: new Date().toISOString() }); return { rowCount: 1, rows: [] } }
+    if (sql.includes('INSERT INTO photos')) { const [survey_id, type, path, size] = params; tabel.photos.set(`${survey_id}-${type}`, { survey_id, type, path, size }); return { rowCount: 1, rows: [] } }
       if (sql.includes('FROM surveys s')) {
         const rows = [...tabel.surveys.values()].map(s => ({ ...s, surveyor: tabel.surveyors.find(u => u.id === s.surveyor_id)?.nama,
           photos: [...tabel.photos.values()].filter(p => p.survey_id === s.id).map(p => ({ type: p.type, size: p.size })) }))
@@ -31,7 +35,8 @@ export async function buatPoolTiruan() {
     }
   }
   const disk = new Map()
-  const simpanKeStorage = async (path, buf) => { disk.set(path, buf.length) }
+  const simpanKeStorage = async (path, buf) => { disk.set(path, buf) }
+  const bacaDariStorage = async (path) => { const b = disk.get(path); if (!b) throw new Error('tidak ada'); return b }
 
-  return { pool, tabel, disk, simpanKeStorage, surveyorId }
+  return { pool, tabel, disk, simpanKeStorage, bacaDariStorage, surveyorId }
 }

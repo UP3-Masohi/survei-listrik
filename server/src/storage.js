@@ -9,3 +9,7 @@ export async function simpanKeStorage(path, buffer) {
   await fs.mkdir(dirname(tujuan), { recursive: true })
   await fs.writeFile(tujuan, buffer)
 }
+
+export async function bacaDariStorage(path) {
+  return fs.readFile(join(FOTO_DIR, path))
+}

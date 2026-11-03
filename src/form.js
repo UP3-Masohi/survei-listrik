@@ -1,7 +1,7 @@
 import { v4 as uuid } from 'uuid'
-import { db, simpanSurvei } from './db.js'
+import { db, simpanSurvei, bacaSurvei } from './db.js'
 import { tampilkanLayar, tampilkanNotifikasi } from './main.js'
-import { tampilkanJumlahPending, kirimUlang, ambilGalatTerakhir } from './sync.js'
+import { tampilkanJumlahPending, kirimUlang, ambilGalatTerakhir, jalankanSync } from './sync.js'
 import { JENIS_FOTO, muatPratinjau, pasangInputFoto } from './camera.js'
 import { ambilLokasi, tampilkanPeta, pesanGalatLokasi } from './geo.js'
 
@@ -321,10 +321,28 @@ function pasangTandaTangan(canvas, s, { hanyaBaca, onUbah }) {
 // ===================== Halaman form =====================
 
 export async function tampilkanForm(el, { id, surveyorId }) {
-  const s = id ? await db.surveys.get(id) : surveiBaru(surveyorId)
+  const s = id ? await bacaSurvei(id) : surveiBaru(surveyorId)
   if (!s) {
     tampilkanNotifikasi('Survei tidak ditemukan')
     return tampilkanLayar('beranda')
+  }
+  if (s.status === 'sent') {
+    // Isi form dan foto sudah dihapus dari HP setelah server mengonfirmasi (Langkah 8)
+    el.innerHTML = `
+      <div class="form-atas">
+        <button type="button" class="tautan" id="btn-kembali">‹ Daftar survei</button>
+        <span class="status status-sent">${LABEL_STATUS.sent}</span>
+      </div>
+      <section class="kartu">
+        <h2 id="ringkasan-nama"></h2>
+        <p id="ringkasan-kelurahan"></p>
+        <p>Terkirim ${formatTanggal(s.sentAt)}. Data pelanggan, lokasi, dan foto sudah dihapus dari HP ini
+           sesuai aturan privasi; data lengkap tersimpan di server.</p>
+      </section>`
+    el.querySelector('#ringkasan-nama').textContent = s.ringkasan?.nama || 'Tanpa nama'
+    el.querySelector('#ringkasan-kelurahan').textContent = s.ringkasan?.kelurahan ? `Kelurahan/Desa ${s.ringkasan.kelurahan}` : ''
+    el.querySelector('#btn-kembali').addEventListener('click', () => tampilkanLayar('beranda'))
+    return
   }
   const hanyaBaca = s.status === 'sent' || s.status === 'pending'   // status hanya bergerak maju
   const statusAwal = s.status
@@ -457,6 +475,7 @@ export async function tampilkanForm(el, { id, surveyorId }) {
       await tampilkanJumlahPending()
       tampilkanNotifikasi('Survei disimpan, menunggu kirim')
       keluar()
+      jalankanSync()   // bila sedang online, langsung dikirim tanpa menunggu putaran 60 detik
     } finally {
       tombol.disabled = false
     }

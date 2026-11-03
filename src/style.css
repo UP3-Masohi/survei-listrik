@@ -316,3 +316,24 @@ input:disabled, select:disabled, textarea:disabled { background: var(--abu); col
 #status-gps { margin-top: 8px; }
 
 .galat-info { background: #ffebee; color: var(--merah); margin-bottom: 8px; }
+
+/* ---------- Login, PIN, kunci ---------- */
+.atas-kanan { display: flex; align-items: center; gap: 8px; }
+
+.tombol-kunci {
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.input-pin {
+  letter-spacing: 0.5em;
+  font-size: 1.4rem;
+  text-align: center;
+}

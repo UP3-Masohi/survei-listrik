@@ -16,3 +16,12 @@ CREATE TABLE photos (
 
 CREATE INDEX surveys_created_at_idx ON surveys (created_at);
 CREATE INDEX surveys_surveyor_idx ON surveys (surveyor_id);
+
+-- Langkah 8: log siapa membuka foto siapa dan kapan
+CREATE TABLE photo_access_log (
+  id bigserial PRIMARY KEY,
+  survey_id uuid, type text,
+  admin_id uuid REFERENCES surveyors(id),
+  accessed_at timestamptz DEFAULT now()
+);
+CREATE INDEX photo_access_log_survey_idx ON photo_access_log (survey_id);

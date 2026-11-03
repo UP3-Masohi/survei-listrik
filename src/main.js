@@ -1,14 +1,13 @@
 import './style.css'
 import { registerSW } from 'virtual:pwa-register'
-import { db } from './db.js'
+import { daftarSurvei } from './db.js'
 import { tampilkanForm, LABEL_STATUS, formatTanggal } from './form.js'
-import { tampilkanJumlahPending } from './sync.js'
+import { tampilkanJumlahPending, jalankanSync } from './sync.js'
+import { muatSesi, getSurveyor, sesiKedaluwarsa, adaPin, sudahTerbuka, kunci,
+         tampilkanLogin, tampilkanBuatPin, tampilkanPin } from './auth.js'
 
 // Minta penyimpanan permanen agar browser tidak menghapus data saat memori HP penuh
 if (navigator.storage?.persist) navigator.storage.persist()
-
-// Sementara: ID surveyor tetap; diganti oleh auth.js pada Langkah 8
-const SURVEYOR_ID = 'u-lokal'
 
 // ---------- Notifikasi kecil di bawah layar ----------
 const elNotif = document.getElementById('notifikasi')
@@ -51,6 +50,7 @@ const perbaruiSW = registerSW({
 const layar = {}
 const elApp = document.getElementById('app')
 let layarAktif = null
+let syncSudahDimulai = false   // sync.js tidak bisa membaca data sebelum PIN benar
 
 export function daftarkanLayar(nama, render) {
   layar[nama] = render
@@ -59,10 +59,24 @@ export function daftarkanLayar(nama, render) {
 export async function tampilkanLayar(nama, params = {}) {
   const render = layar[nama]
   if (!render) throw new Error(`Layar "${nama}" belum terdaftar`)
+  // Layar data hanya boleh dibuka setelah PIN benar (kunci enkripsi ada di memori)
+  const butuhKunci = !['login', 'buat-pin', 'pin'].includes(nama)
+  if (butuhKunci && !sudahTerbuka()) {
+    nama = getSurveyor() ? ((await adaPin()) ? 'pin' : 'buat-pin') : 'login'
+    params = {}
+  }
   layarAktif = nama
+  document.getElementById('btn-kunci').hidden = !sudahTerbuka()
+  document.getElementById('badge-pending').hidden = !sudahTerbuka()   // jumlah antrian hanya setelah PIN
   elApp.innerHTML = ''
-  await render(elApp, params)
+  await layar[nama](elApp, params)
   window.scrollTo(0, 0)
+  // Sekali setiap kali aplikasi dibuka dengan PIN: segarkan badge dan proses antrian
+  if (butuhKunci && sudahTerbuka() && !syncSudahDimulai) {
+    syncSudahDimulai = true
+    tampilkanJumlahPending()
+    jalankanSync()
+  }
 }
 
 // Setelah antrian diproses, segarkan daftar agar status "Terkirim" langsung terlihat
@@ -72,7 +86,7 @@ document.addEventListener('sync-selesai', () => {
 
 // ---------- Beranda: daftar survei ----------
 daftarkanLayar('beranda', async (el) => {
-  const daftar = await db.surveys.orderBy('createdAt').reverse().toArray()
+  const daftar = await daftarSurvei()
   el.innerHTML = `
     <button type="button" class="tombol" id="btn-survei-baru">+ Survei baru</button>
     <section class="daftar" id="daftar-survei"></section>
@@ -95,18 +109,36 @@ daftarkanLayar('beranda', async (el) => {
         <span class="item-waktu"></span>
         <span class="status status-${s.status}">${LABEL_STATUS[s.status] ?? s.status}</span>
       </div>`
-    item.querySelector('.item-judul').textContent = s.pelanggan?.nama?.trim() || 'Tanpa nama'
-    item.querySelector('.item-sub').textContent = [s.pelanggan?.alamat, s.pelanggan?.kelurahan]
-      .filter(Boolean).join(', ') || 'Alamat belum diisi'
+    item.querySelector('.item-judul').textContent = s.ringkasan?.nama?.trim() || s.pelanggan?.nama?.trim() || 'Tanpa nama'
+    item.querySelector('.item-sub').textContent = (s.ringkasan?.kelurahan || s.pelanggan?.kelurahan)
+      ? `Kelurahan/Desa ${s.ringkasan?.kelurahan || s.pelanggan?.kelurahan}` : 'Kelurahan belum diisi'
     item.querySelector('.item-waktu').textContent = formatTanggal(s.updatedAt || s.createdAt)
     item.addEventListener('click', () => tampilkanLayar('form', { id: s.id }))
     wadah.appendChild(item)
   }
   el.querySelector('#btn-survei-baru').addEventListener('click',
-    () => tampilkanLayar('form', { surveyorId: SURVEYOR_ID }))
+    () => tampilkanLayar('form', { surveyorId: getSurveyor()?.id }))
 })
 
 daftarkanLayar('form', tampilkanForm)
+daftarkanLayar('login', tampilkanLogin)
+daftarkanLayar('buat-pin', tampilkanBuatPin)
+daftarkanLayar('pin', tampilkanPin)
 
-tampilkanJumlahPending()
-tampilkanLayar('beranda')
+// Tombol Kunci: buang kunci enkripsi dari memori, kembali ke layar PIN
+document.getElementById('btn-kunci').addEventListener('click', () => {
+  kunci()
+  syncSudahDimulai = false
+  tampilkanLayar('pin')
+})
+
+// ---------- Alur mulai (Langkah 8) ----------
+async function mulai() {
+  await muatSesi()
+  if (!getSurveyor()) return tampilkanLayar('login')
+  if (sesiKedaluwarsa() && navigator.onLine) {
+    return tampilkanLayar('login', { pesan: 'Sesi 7 hari sudah berakhir. Masuk lagi untuk melanjutkan.' })
+  }
+  tampilkanLayar((await adaPin()) ? 'pin' : 'buat-pin')
+}
+mulai()

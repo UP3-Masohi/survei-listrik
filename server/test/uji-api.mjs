@@ -4,9 +4,9 @@ import { buatPoolTiruan } from './pool-tiruan.mjs'
 
 import { buatApp } from '../src/app.js'
 
-const { pool, tabel, disk, simpanKeStorage, surveyorId } = await buatPoolTiruan()
+const { pool, tabel, disk, simpanKeStorage, bacaDariStorage, surveyorId } = await buatPoolTiruan()
 
-const app = buatApp({ pool, simpanKeStorage, corsOrigin: ['http://localhost:5173'] })
+const app = buatApp({ pool, simpanKeStorage, bacaDariStorage, corsOrigin: ['http://localhost:5173'] })
 const server = app.listen(0)
 const BASE = `http://127.0.0.1:${server.address().port}`
 const hasil = []
@@ -84,7 +84,25 @@ cek('CORS origin PWA diizinkan', r.headers.get('access-control-allow-origin') ==
 r = await fetch(`${BASE}/health`, { headers: { Origin: 'https://situs-lain.id' } })
 cek('CORS origin lain tidak diizinkan', r.headers.get('access-control-allow-origin') === null)
 
-// 8. JSON rusak -> 400
+// 8. URL foto bertanda tangan (Langkah 8)
+r = await fetch(`${BASE}/surveys/${id}/photos/ktp/url`, { headers: auth() })
+cek('minta URL foto oleh surveyor -> 403', r.status === 403)
+r = await fetch(`${BASE}/surveys/${id}/photos/ktp/url`, { headers: auth(tokenAdmin) })
+const { url, expiresAt } = await json(r)
+cek('minta URL foto oleh admin -> 200 + url + expiresAt', r.status === 200 && url?.startsWith(`/photos/${id}/ktp?`) && !!expiresAt)
+r = await fetch(`${BASE}${url}`)
+cek('buka URL bertanda tangan tanpa token -> 200 image/jpeg', r.status === 200 && r.headers.get('content-type') === 'image/jpeg' && (await r.arrayBuffer()).byteLength === 100 * 1024)
+cek('akses foto tercatat di log dengan id admin', tabel.log.length === 1 && tabel.log[0].admin_id === '22222222-2222-4222-8222-222222222222')
+r = await fetch(`${BASE}${url.replace(/sig=.{6}/, 'sig=000000')}`)
+cek('tanda tangan diubah -> 403', r.status === 403)
+r = await fetch(`${BASE}${url.replace(/exp=\d+/, 'exp=1000')}`)
+cek('tautan kedaluwarsa -> 403', r.status === 403)
+r = await fetch(`${BASE}/surveys/${id}/photos/kk/url`.replace(id, 'ffffffff-ffff-4fff-8fff-ffffffffffff'), { headers: auth(tokenAdmin) })
+cek('URL foto survei tidak ada -> 404', r.status === 404)
+r = await fetch(`${BASE}/photos/${id}/ktp`)
+cek('foto tanpa parameter -> 400', r.status === 400)
+
+// 9. JSON rusak -> 400
 r = await fetch(`${BASE}/surveys/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...auth() }, body: '{rusak' })
 cek('JSON rusak -> 400', r.status === 400)
 

@@ -1,4 +1,5 @@
-import { db } from './db.js'
+import { db, daftarFoto } from './db.js'
+import { enkripsiBytes } from './auth.js'
 
 export async function kompresFoto(file, maxPx = 1280, mutu = 0.8) {
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
@@ -13,7 +14,9 @@ export async function kompresFoto(file, maxPx = 1280, mutu = 0.8) {
 
 export async function simpanFoto(surveyId, tipe, file) {
   const blob = await kompresFoto(file)
-  await db.photos.put({ id: `${surveyId}-${tipe}`, surveyId, type: tipe, blob, size: blob.size })
+  // Langkah 8: foto KTP/KK berisi NIK, jadi disimpan terenkripsi (AES-GCM) di IndexedDB
+  const { iv, data } = await enkripsiBytes(await blob.arrayBuffer())
+  await db.photos.put({ id: `${surveyId}-${tipe}`, surveyId, type: tipe, blob: new Blob([data]), iv, size: blob.size })
   return URL.createObjectURL(blob)   // untuk pratinjau
 }
 
@@ -38,7 +41,7 @@ function tampilkanPratinjau(root, tipe, url, size) {
 
 // Tampilkan foto yang sudah ada di IndexedDB (saat draf dibuka kembali)
 export async function muatPratinjau(root, surveyId) {
-  const daftar = await db.photos.where('surveyId').equals(surveyId).toArray()
+  const daftar = await daftarFoto(surveyId)
   for (const f of daftar) tampilkanPratinjau(root, f.type, URL.createObjectURL(f.blob), f.size)
   return daftar.length
 }
