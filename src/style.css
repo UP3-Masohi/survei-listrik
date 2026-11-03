@@ -576,7 +576,7 @@ table.tabel { width: 100%; border-collapse: collapse; font-size: 0.86rem; min-wi
 .tabel tbody tr.aktif { background: var(--biru-50); }
 .tabel td.nama { font-weight: 700; }
 
-.detail-foto { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 10px; }
+.detail-foto { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
 .detail-foto figure { margin: 0; }
 .detail-foto img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: var(--radius-kecil); border: 1px solid var(--abu-200); background: var(--abu-100); }
 .detail-foto figcaption { font-size: 0.76rem; color: var(--teks-muda); text-align: center; margin-top: 4px; }
