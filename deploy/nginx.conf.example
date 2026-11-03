@@ -1,0 +1,51 @@
+# Nginx untuk Survei Listrik: satu domain melayani aplikasi (dist/) dan meneruskan /api ke API di port 3000.
+# Ganti DOMAIN_ANDA, simpan sebagai /etc/nginx/sites-available/survei-listrik, lalu aktifkan (setup-vps.sh melakukan ini).
+# HTTPS ditambahkan certbot: certbot --nginx -d DOMAIN_ANDA
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name DOMAIN_ANDA;
+
+    root /var/www/survei-listrik;
+    index index.html;
+
+    client_max_body_size 5m;          # foto maks 2 MB + overhead multipart
+
+    gzip on;
+    gzip_types text/css application/javascript application/json application/manifest+json image/svg+xml;
+
+    # API: /api/... -> http://127.0.0.1:3000/... (awalan /api dibuang)
+    location /api/ {
+        proxy_pass http://127.0.0.1:3000/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 60s;
+    }
+
+    # Service worker dan index.html tidak boleh di-cache agar versi baru segera terpasang
+    location = /sw.js {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Service-Worker-Allowed "/";
+    }
+    location = /index.html {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+    }
+    location = /manifest.webmanifest {
+        add_header Cache-Control "no-cache";
+        types { } default_type application/manifest+json;
+    }
+
+    # Aset ber-hash boleh di-cache lama
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
+    # PWA satu halaman
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -1,0 +1,16 @@
+# Lapisan produksi di atas docker-compose.yml:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# Port database dan API hanya di 127.0.0.1 (lihat docker-compose.yml); Nginx meneruskan /api ke 3000.
+services:
+  db:
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?isi DB_PASSWORD di server/.env}
+    restart: unless-stopped
+
+  api:
+    environment:
+      DATABASE_URL: postgres://survei:${DB_PASSWORD:?isi DB_PASSWORD di server/.env}@db:5432/survei
+      JWT_SECRET: ${JWT_SECRET:?isi JWT_SECRET di server/.env}
+      CORS_ORIGIN: ${CORS_ORIGIN:-}
+      NODE_ENV: production
+    restart: unless-stopped

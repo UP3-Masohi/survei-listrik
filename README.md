@@ -62,12 +62,49 @@ Workflow `.github/workflows/pages.yml` membangun dan menayangkan `dist/` ke
 
 Catatan: GitHub Pages pada repo privat memerlukan paket GitHub berbayar; pada paket gratis, repo harus publik.
 
-## Deploy produksi
+## Deploy produksi di VPS (satu domain, HTTPS)
 
-1. Jalankan API dengan `docker compose up -d --build` di `server/` pada VPS, atau Railway/Render, di balik HTTPS.
-2. Isi `.env` dengan `VITE_API_URL=https://api.domain-anda.id`, lalu `npm run build`.
-3. Unggah folder `dist/` ke hosting statis HTTPS (Cloudflare Pages, Netlify, Vercel, atau Nginx).
-4. Isi `CORS_ORIGIN` di server dengan domain aplikasi, dan ganti `JWT_SECRET`.
+Berkas di folder `deploy/`:
+
+| Berkas | Fungsi |
+| --- | --- |
+| `deploy/setup-vps.sh` | pemasangan awal sekali saja: Docker, Nginx, certbot, Node 22, clone repo, rahasia, HTTPS |
+| `deploy/deploy.sh` | deploy ulang: `git pull`, build PWA, salin `dist/` ke Nginx, bangun ulang API, jalankan `schema.sql` |
+| `deploy/nginx.conf.example` | Nginx melayani `dist/` dan meneruskan `/api/` ke API di port 3000 |
+| `server/docker-compose.prod.yml` | lapisan produksi: password DB dan `JWT_SECRET` dari `server/.env`, restart otomatis |
+
+Prasyarat: VPS Ubuntu 22.04/24.04 (1–2 GB RAM), akses SSH sebagai root, dan satu domain yang record A-nya
+sudah mengarah ke IP VPS.
+
+Pemasangan awal (di VPS, sebagai root):
+
+```bash
+git clone https://github.com/UP3-Masohi/survei-listrik.git /opt/survei-listrik && bash /opt/survei-listrik/deploy/setup-vps.sh survei.domain-anda.id
+```
+
+Lalu buat akun:
+
+```bash
+cd /opt/survei-listrik/server && docker compose exec api node scripts/buat-surveyor.js surveyor1 <password> "Nama Surveyor"
+```
+
+```bash
+cd /opt/survei-listrik/server && docker compose exec api node scripts/buat-surveyor.js admin <password> "Admin" admin
+```
+
+Setiap ada perubahan di GitHub:
+
+```bash
+cd /opt/survei-listrik && bash deploy/deploy.sh
+```
+
+Catatan:
+- `schema.sql` memakai `IF NOT EXISTS`, jadi tabel baru ikut terbuat di database lama saat deploy ulang.
+- Port database dan API hanya didengarkan di `127.0.0.1`; dari luar hanya Nginx (80/443) yang terbuka.
+- Rahasia ada di `server/.env` (dibuat otomatis oleh `setup-vps.sh`, tidak masuk git). Cadangkan file itu
+  bersama volume `pgdata` dan `foto`.
+- Jika aplikasi juga ditayangkan di GitHub Pages, isi `CORS_ORIGIN=https://<akun>.github.io` di `server/.env`
+  dan variabel repo `VITE_API_URL=https://survei.domain-anda.id/api`.
 
 ## Struktur
 
