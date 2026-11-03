@@ -21,8 +21,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Survei Calon Pelanggan Listrik',
-        short_name: 'Survei Listrik',
+        name: 'Survey Calon Pelanggan',
+        short_name: 'Survey Pelanggan',
         lang: 'id',
         start_url: BASE,
         scope: BASE,

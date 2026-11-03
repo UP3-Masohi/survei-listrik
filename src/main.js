@@ -86,7 +86,7 @@ function perbaruiHeader() {
   const surveyor = getSurveyor()
   const terbuka = sudahTerbuka()
   document.getElementById('atas-sub').textContent = surveyor
-    ? `${surveyor.nama}${surveyor.role === 'admin' ? ' · Admin' : ''}` : 'Calon pelanggan'
+    ? `${surveyor.nama}${surveyor.role === 'admin' ? ' · Admin' : ''}` : 'Listrik'
   document.getElementById('btn-kunci').hidden = !terbuka
   document.getElementById('badge-pending').hidden = !terbuka || adminAktif()
   const nav = document.getElementById('btn-nav')

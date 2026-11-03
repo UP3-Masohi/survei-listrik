@@ -152,7 +152,7 @@ function ikatTitik(input, wadah) {
 export function tampilkanLogin(el, { pesan } = {}) {
   el.innerHTML = `
     <div class="masuk-wadah">
-      ${hero('Survei Listrik', 'Survei calon pelanggan, bekerja tanpa sinyal')}
+      ${hero('Survey Calon Pelanggan', 'Survei calon pelanggan listrik, bekerja tanpa sinyal')}
       <section class="kartu">
         <h2>Masuk</h2>
         <p>${pesan || 'Login membutuhkan koneksi internet. Setelah itu aplikasi bisa dipakai tanpa sinyal dengan PIN.'}</p>
