@@ -50,6 +50,18 @@ Catatan:
 - Satu Wi-Fi tanpa tunnel: buka `http://<IP-Mac>:4173` di HP. Form dan kamera berjalan, tetapi mode offline
   dan GPS diblokir browser karena bukan HTTPS.
 
+## Deploy ke GitHub Pages (hanya aplikasi, API terpisah)
+
+Workflow `.github/workflows/pages.yml` membangun dan menayangkan `dist/` ke
+`https://<akun>.github.io/survei-listrik/` setiap push ke `main`. Sekali saja di GitHub:
+
+1. Settings → Pages → Source: **GitHub Actions**.
+2. Settings → Secrets and variables → Actions → Variables → `VITE_API_URL` = alamat API yang bisa dijangkau HP,
+   misalnya `https://api.domain-anda.id` atau sementara `https://<tunnel>.trycloudflare.com/api`.
+3. Di server API, `CORS_ORIGIN` harus berisi `https://<akun>.github.io`.
+
+Catatan: GitHub Pages pada repo privat memerlukan paket GitHub berbayar; pada paket gratis, repo harus publik.
+
 ## Deploy produksi
 
 1. Jalankan API dengan `docker compose up -d --build` di `server/` pada VPS, atau Railway/Render, di balik HTTPS.

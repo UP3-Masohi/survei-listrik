@@ -8,7 +8,11 @@ const proxyApi = {
   '/api': { target: API_LOKAL, changeOrigin: true, rewrite: (path) => path.replace(/^\/api/, '') }
 }
 
+// Base path: '/' di VPS/domain sendiri, '/survei-listrik/' di GitHub Pages (diisi workflow lewat BASE_PATH)
+const BASE = process.env.BASE_PATH || '/'
+
 export default defineConfig({
+  base: BASE,
   server: { host: true, allowedHosts: true, proxy: proxyApi },
   preview: { host: true, allowedHosts: true, proxy: proxyApi },
   plugins: [
@@ -18,7 +22,8 @@ export default defineConfig({
         name: 'Survei Calon Pelanggan Listrik',
         short_name: 'Survei Listrik',
         lang: 'id',
-        start_url: '/',
+        start_url: BASE,
+        scope: BASE,
         display: 'standalone',
         background_color: '#ffffff',
         theme_color: '#0b5ed7',
